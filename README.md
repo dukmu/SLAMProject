@@ -3,6 +3,7 @@
 **Associated Publication:**
 - **OA-SLAM: Leveraging Objects for Camera Relocalization in Visual SLAM.** Matthieu Zins, Gilles Simon, Marie-Odile Berger, *IEEE International Symposium on Mixed and Augmented Reality (ISMAR 2022).* [Paper](https://arxiv.org/abs/2209.08338) | [Video](https://youtu.be/L1HEL4kLJ3g) | [AR Demo](https://youtu.be/PXG_6LkbtgY)
 
+- **Object-Aided SLAM in a World of Objects**, *Demo CVPR 2023*
 
 
 <p align="center">

@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
+cmake_policy(SET CMP0048 NEW)
 project(ORB_SLAM2)
 
 IF(NOT CMAKE_BUILD_TYPE)
@@ -105,7 +106,7 @@ dlib::dlib
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
 add_executable(oa-slam
-Examples/oa-slam.cc)
+Examples/oa-slam.cc Examples/dataset.cc)
 target_link_libraries(oa-slam ${PROJECT_NAME})
 
 add_executable(oa-slam_localization

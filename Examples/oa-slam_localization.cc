@@ -84,7 +84,6 @@ int main(int argc, char **argv)
 
     // Possible to pass a file listing images instead of a folder containing a file rgb.txt
     std::string image_list_file = "rgb.txt";
-    int nn = path_to_images.size();
     if (!use_webcam && get_file_extension(path_to_images) == "txt") {
         int pos = path_to_images.find_last_of('/');
         image_list_file = path_to_images.substr(pos+1);
@@ -159,7 +158,7 @@ int main(int argc, char **argv)
         LoadImages(strFile, vstrImageFilenames, vTimestamps);
         nImages = vstrImageFilenames.size();
     } else {
-        cap.open(0);
+        cap.open(webcam_id);
         std::cout << "Open webcam" << std::endl;
     }
 
@@ -207,7 +206,7 @@ int main(int argc, char **argv)
             filename = path_to_images + vstrImageFilenames[ni];
             im = cv::imread(filename, cv::IMREAD_UNCHANGED);  // read image from disk
         }
-        double tframe = ni < vTimestamps.size() ? vTimestamps[ni] : std::time(nullptr);
+        double tframe = ni < (int)vTimestamps.size() ? vTimestamps[ni] : std::time(nullptr);
         if(im.empty())
         {
             cerr << endl << "Failed to load image: "
@@ -274,7 +273,7 @@ int main(int argc, char **argv)
 
     // Relocalization time statistics
     std::ofstream file_times(output_folder + "relocalization_times.txt");
-    for (int i = 0; i < reloc_times.size(); ++i) {
+    for (int i = 0; i < (int)reloc_times.size(); ++i) {
         file_times << reloc_times[i] << " " << (int)reloc_status[i] << "\n";
     }
     file_times.close();

@@ -157,12 +157,10 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     int fMinThFAST = fSettings["ORBextractor.minThFAST"];
 
     mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+    mpIniORBextractor = new ORBextractor(2*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
     if(sensor==System::STEREO)
         mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
-
-    if(sensor==System::MONOCULAR)
-        mpIniORBextractor = new ORBextractor(2*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
     cout << endl  << "ORB Extractor Parameters: " << endl;
     cout << "- Number of Features: " << nFeatures << endl;
@@ -215,7 +213,8 @@ void Tracking::SetARViewer(ARViewer *pARViewer)
 }
 
 
-cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp)
+cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp,
+                                     const std::vector<Detection::Ptr>& detections, bool force_relocalize)
 {
     mImGray = imRectLeft;
     cv::Mat imGrayRight = imRectRight;
@@ -249,13 +248,15 @@ cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRe
 
     mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
-    Track();
+    // Track();
+    GrabObject(imRectLeft, detections, force_relocalize);
 
     return mCurrentFrame.mTcw.clone();
 }
 
 
-cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp)
+cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp,
+                                     const std::vector<Detection::Ptr>& detections, bool force_relocalize)
 {
     mImGray = imRGB;
     cv::Mat imDepth = imD;
@@ -278,40 +279,23 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
     if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F)
         imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
 
-    mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
+        mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    else
+        mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
-    Track();
+    // Track();
+    GrabObject(imRGB, detections, force_relocalize);
 
     return mCurrentFrame.mTcw.clone();
 }
 
-
-cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp,
+void Tracking::GrabObject(const cv::Mat &im,
                                      const std::vector<Detection::Ptr>& detections, bool force_relocalize)
 {
     current_frame_idx_ = (current_frame_idx_ + 1) % (std::numeric_limits<size_t>::max()-1);
     mImGray = im;
     im.copyTo(im_rgb_);
-
-    if(mImGray.channels()==3)
-    {
-        if(mbRGB)
-            cvtColor(mImGray,mImGray,CV_RGB2GRAY);
-        else
-            cvtColor(mImGray,mImGray,CV_BGR2GRAY);
-    }
-    else if(mImGray.channels()==4)
-    {
-        if(mbRGB)
-            cvtColor(mImGray,mImGray,CV_RGBA2GRAY);
-        else
-            cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
-    }
-
-    if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
-        mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
-    else
-        mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
 
     current_frame_detections_ = detections;
     current_frame_good_detections_.clear();
@@ -634,6 +618,32 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp,
         if (mCurrentFrame.mTcw.rows == 4)
             mpARViewer->SetCurrentCameraPose(cvToEigenMatrix<double, float, 3, 4>(mCurrentFrame.mTcw));
     }
+}
+
+cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp,
+                                     const std::vector<Detection::Ptr>& detections, bool force_relocalize)
+{
+
+    if(mImGray.channels()==3)
+    {
+        if(mbRGB)
+            cvtColor(mImGray,mImGray,CV_RGB2GRAY);
+        else
+            cvtColor(mImGray,mImGray,CV_BGR2GRAY);
+    }
+    else if(mImGray.channels()==4)
+    {
+        if(mbRGB)
+            cvtColor(mImGray,mImGray,CV_RGBA2GRAY);
+        else
+            cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
+    }
+
+    if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
+        mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    else
+        mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    GrabObject(im, detections, force_relocalize);
 
     return mCurrentFrame.mTcw.clone();
 }

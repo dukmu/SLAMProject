@@ -82,9 +82,9 @@ class System
 public:
     // Input sensor
     enum eSensor{
-        MONOCULAR=0,
-        STEREO=1,
-        RGBD=2
+        MONOCULAR=0, // supported
+        STEREO=1, // unsupported
+        RGBD=2 // supported
     };
 
 public:
@@ -95,13 +95,15 @@ public:
     // Proccess the given stereo frame. Images must be synchronized and rectified.
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
-    cv::Mat TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp);
+    cv::Mat TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp,
+                                     const std::vector<Detection::Ptr>& detections, bool force_relocalize);
 
     // Process the given rgbd frame. Depthmap must be registered to the RGB frame.
     // Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Input depthmap: Float (CV_32F).
     // Returns the camera pose (empty if tracking fails).
-    cv::Mat TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp);
+    cv::Mat TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp,
+                                     const std::vector<Detection::Ptr>& detections, bool force_relocalize);
 
     // Proccess the given monocular frame
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.

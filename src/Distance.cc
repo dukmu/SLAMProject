@@ -180,7 +180,7 @@ std::vector<double> solve_polynomial(double a, double b, double c, bool force_on
     }
 }
 
-
+// 给定y求切点
 std::vector<Eigen::Vector2d> find_intersection_ellipse_horiz_line(const Ellipse& ell, double y, bool force_tangency=false)
 {
     Eigen::Matrix3d C = ell.ComposePrimalMatrix();
@@ -191,7 +191,7 @@ std::vector<Eigen::Vector2d> find_intersection_ellipse_horiz_line(const Ellipse&
     return {a, b};
 }
 
-
+// 给定x求切点
 std::vector<Eigen::Vector2d> find_intersection_ellipse_vert_line(const Ellipse& ell, double x, bool force_tangency=false)
 {
     Eigen::Matrix3d C = ell.ComposePrimalMatrix();
@@ -205,25 +205,25 @@ std::vector<Eigen::Vector2d> find_intersection_ellipse_vert_line(const Ellipse& 
 std::vector<Eigen::Vector2d> find_intersection_ellipse_bbox(const Ellipse& ell, const BBox2 bbox)
 {
     std::vector<Eigen::Vector2d> inter;
-    auto pts = find_intersection_ellipse_horiz_line(ell, bbox[1]);
+    auto pts = find_intersection_ellipse_horiz_line(ell, bbox[1]); // bottom
     for (auto& p : pts) {
         if (p[0] >= bbox[0] && p[0] <= bbox[2])
             inter.push_back(p);
     }
 
-    pts = find_intersection_ellipse_vert_line(ell, bbox[0]);
+    pts = find_intersection_ellipse_vert_line(ell, bbox[0]); // left
     for (auto& p : pts) {
         if (p[1] >= bbox[1] && p[1] <= bbox[3])
             inter.push_back(p);
     }
 
-    pts = find_intersection_ellipse_horiz_line(ell, bbox[3]);
+    pts = find_intersection_ellipse_horiz_line(ell, bbox[3]); // top
     for (auto& p : pts) {
         if (p[0] >= bbox[0] && p[0] <= bbox[2])
             inter.push_back(p);
     }
 
-    pts = find_intersection_ellipse_vert_line(ell, bbox[2]);
+    pts = find_intersection_ellipse_vert_line(ell, bbox[2]); // right
     for (auto& p : pts) {
         if (p[1] >= bbox[1] && p[1] <= bbox[3])
             inter.push_back(p);

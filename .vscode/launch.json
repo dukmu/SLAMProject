@@ -12,8 +12,7 @@
             "args": [
                 "../Vocabulary/ORBvoc.txt",
                 "../Cameras/TUM2.yaml",
-                "../../rgbd_dataset_freiburg2_desk/rgb.txt",
-                "../../rgbd_dataset_freiburg2_desk/depth.txt",
+                "../../rgbd_dataset_freiburg2_desk/associate.txt",
                 "../Data/detections_yolov5_tum_rgbd_fr2_desk.json",
                 "null",
                 "points+objects",

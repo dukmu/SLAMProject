@@ -24,6 +24,13 @@
 namespace ORB_SLAM2
 {
 
+    /**
+     * @brief Construct a new Ellipse with it's location axes and orientation
+     * 
+     * @param axes the length of the two axes of ellipse
+     * @param angle the orientation
+     * @param center the center of ellipse
+     */
     Ellipse::Ellipse(const Eigen::Vector2d& axes, double angle, const Eigen::Vector2d& center) {
         Eigen::Matrix3d C_star = Eigen::Matrix3d(Eigen::Vector3d(std::pow(axes[0], 2), 
                                                                  std::pow(axes[1], 2),
@@ -35,7 +42,7 @@ namespace ORB_SLAM2
         Rw_e << std::cos(angle), -std::sin(angle), 0.0,
                 std::sin(angle),  std::cos(angle), 0.0,
                 0.0, 0.0, 1.0;
-        Eigen::Matrix3d transf = T_center * Rw_e;
+        Eigen::Matrix3d transf = T_center * Rw_e; // e_new = T *( R * e), e=[ex, ey, 1]
         C_star = transf * C_star * transf.transpose();
 
         C_ = 0.5 * (C_star + C_star.transpose());
@@ -48,14 +55,15 @@ namespace ORB_SLAM2
     }
 
 
+    // 调整参数为符合约束的形式
     void Ellipse::decompose() const {
         // assumes C_(2, 2) == -1
         center_ = -C_.col(2).head(2);
         Eigen::Matrix3d T_c = Eigen::Matrix3d::Identity();
         T_c(0, 2) = -center_[0];
         T_c(1, 2) = -center_[1];
-        Eigen::Matrix3d temp = T_c * C_ * T_c.transpose();
-        Eigen::Matrix3d C_center = 0.5 * (temp + temp.transpose());
+        Eigen::Matrix3d temp = T_c * C_ * T_c.transpose(); // proj to origen
+        Eigen::Matrix3d C_center = 0.5 * (temp + temp.transpose()); // C 对称
 
         
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> eigen_solver(C_center.block<2, 2>(0, 0));
@@ -74,12 +82,13 @@ namespace ORB_SLAM2
         has_changed_ = false;
     }
 
+    // 计算与椭圆相切的2D BBox
     BBox2 Ellipse::ComputeBbox() const
     {
         if (has_changed_) {
             decompose();
             has_changed_ = false;
-        }
+        } 
         double c = std::cos(angle_);
         double s = std::sin(angle_);
         double xmax = std::sqrt(std::pow(axes_[0]*c, 2) + std::pow(-axes_[1]*s, 2));
@@ -91,6 +100,7 @@ namespace ORB_SLAM2
         return bb;
     }
 
+    // C
     Eigen::Matrix3d Ellipse::ComposePrimalMatrix() const
     {
         if (has_changed_) {

@@ -16,10 +16,11 @@ public:
     virtual bool HasNext() = 0;
 };
 
-class Fr2DeskDataset : public Dataset
+class TUMDataset : public Dataset
 {
 public:
-    Fr2DeskDataset(std::string img_path, std::string depth_path);
+    TUMDataset(std::string associate_file, std::string data_path);
+    TUMDataset(std::string associate_file);
     virtual void init() override;
     virtual double NextFrame(Frame &f) override;
     virtual bool HasNext() override;
@@ -28,10 +29,8 @@ public:
     std::string get_filename(int index = -1) { return img_list[index == -1 ? current_image_index_ : index]; }
 
 private:
-    std::string img_path;
-    std::string depth_path;
-    std::string img_list_file;
-    std::string depth_list_file;
+    std::string data_path;
+    std::string associate_file;
     std::vector<std::string> img_list;
     std::vector<std::string> depth_list;
     std::vector<double> timestamps;

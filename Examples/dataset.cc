@@ -1,49 +1,46 @@
 #include "dataset.hpp"
 #include "opencv2/imgcodecs.hpp"
-Fr2DeskDataset::Fr2DeskDataset(std::string img_path, std::string depth_path)
+#include "Utils.h"
+TUMDataset::TUMDataset(std::string associate_file, std::string data_path)
 {
-    img_list_file = img_path + "rgb.txt";
-    depth_list_file = depth_path + "depth.txt";
-    this->img_path = img_path;
-    this->depth_path = depth_path;
+    this->associate_file = associate_file;
+    this->data_path = data_path;
+    if (this->data_path.back() != '/')
+        this->data_path += "/";
 }
 
-void Fr2DeskDataset::init()
+TUMDataset::TUMDataset(std::string associate_file)
 {
-    std::ifstream img_list_stream(img_list_file);
-    std::ifstream depth_list_stream(depth_list_file);
-    std::string img_line;
-    std::string depth_line;
-    while (std::getline(img_list_stream, img_line))
+    this->associate_file = associate_file;
+    int pos = associate_file.find_last_of('/');
+    this->data_path = associate_file.substr(0, pos + 1);
+}
+
+void TUMDataset::init()
+{
+    std::ifstream associate(associate_file);
+    std::string line;
+    while (std::getline(associate, line))
     {
-        if(img_line[0] == '#')
+        if(line[0] == '#')
             continue;
-        std::stringstream img_line_stream(img_line);
-        std::string img_name;
+        std::stringstream line_stream(line);
+        std::string var;
         double timestamp;
-        img_line_stream >> timestamp >> img_name;
-        img_list.push_back(img_name);
+        line_stream >> timestamp >> var;
         timestamps.push_back(timestamp);
+        img_list.push_back(var);
+        line_stream >> timestamp >> var;
+        depth_list.push_back(var);
     }
     max_image_index_ = img_list.size();
-    while (std::getline(depth_list_stream, depth_line))
-    {
-        if(depth_line[0] == '#')
-            continue;
-        std::stringstream depth_line_stream(depth_line);
-        std::string depth_name;
-        double timestamp;
-        depth_line_stream >> timestamp >> depth_name;
-        depth_list.push_back(depth_name);
-    }
-    max_image_index_ = std::min(max_image_index_, (int)depth_list.size());
 }
 
-double Fr2DeskDataset::NextFrame(Frame &f)
+double TUMDataset::NextFrame(Frame &f)
 {
     f.clear();
-    std::string img_name = img_path + img_list[current_image_index_];
-    std::string depth_name = depth_path + depth_list[current_image_index_];
+    std::string img_name = data_path + img_list[current_image_index_];
+    std::string depth_name = data_path + depth_list[current_image_index_];
     cv::Mat img = cv::imread(img_name, cv::IMREAD_UNCHANGED);
     cv::Mat depth = cv::imread(depth_name, cv::IMREAD_UNCHANGED);
     f.push_back(img);
@@ -52,7 +49,7 @@ double Fr2DeskDataset::NextFrame(Frame &f)
     return timestamps[current_image_index_];
 }
 
-bool Fr2DeskDataset::HasNext()
+bool TUMDataset::HasNext()
 {
     return current_image_index_ < max_image_index_;
 }

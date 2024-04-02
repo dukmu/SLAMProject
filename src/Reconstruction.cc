@@ -119,7 +119,7 @@ Eigen::Vector3d TriangulatePointsRansac(const std::vector<Eigen::Vector2d, Eigen
         return TriangulatePoints(inliers_points, inliers_projections);
 }
 
-
+// init ellipsoid([c,c,c], eye(3), 1,  pos)
 std::pair<bool, Ellipsoid>
 ReconstructEllipsoidFromCenters(const std::vector<BBox2, Eigen::aligned_allocator<BBox2>>& bboxes,
                                 const std::vector<Matrix34d, Eigen::aligned_allocator<Matrix34d>>& Rts, 

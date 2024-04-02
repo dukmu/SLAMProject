@@ -44,15 +44,14 @@ int main(int argc, char **argv)
     srand(time(nullptr));
     std::cout << "C++ version: " << __cplusplus << std::endl;
 
-    if (argc != 9)
+    if (argc != 8)
     {
         cerr << endl
              << "Usage:\n"
                 " ./oa-slam\n"
                 "      vocabulary_file\n"
                 "      camera_file\n"
-                "      path_to_image_sequence (.txt file listing the images or a folder with rgb.txt or 'webcam_id')\n"
-                "      path_to_depth_sequence (.txt file listing the depth images or a folder with depth.txt)\n"
+                "      path_to_associate_file\n"
                 "      detections_file (.json file with detections or .onnx yolov5 weights)\n"
                 "      categories_to_ignore_file (file containing the categories to ignore (one category_id per line))\n"
                 "      relocalization_mode ('points', 'objects' or 'points+objects')\n"
@@ -62,41 +61,11 @@ int main(int argc, char **argv)
 
     std::string vocabulary_file = string(argv[1]);
     std::string parameters_file = string(argv[2]);
-    string path_to_images = string(argv[3]);
-    string path_to_depth = string(argv[4]);
-    std::string detections_file(argv[5]);
-    std::string categories_to_ignore_file(argv[6]);
-    string reloc_mode = string(argv[7]);
-    string output_name = string(argv[8]);
-
-    // possible to pass 'webcam_X' where 'X' is the webcam id
-    bool use_webcam = false;
-    int webcam_id = 0;
-    if (path_to_images.size() >= 6 && path_to_images.substr(0, 6) == "webcam")
-    {
-        use_webcam = true;
-        if (path_to_images.size() > 7)
-        {
-            webcam_id = std::stoi(path_to_images.substr(7));
-        }
-    }
-
-    // Possible to pass a file listing images instead of a folder containing a file rgb.txt or "webcam"
-    if (!use_webcam && get_file_extension(path_to_images) == "txt")
-    {
-        int pos = path_to_images.find_last_of('/');
-        path_to_images = path_to_images.substr(0, pos + 1);
-    }
-    if (!use_webcam && get_file_extension(path_to_depth) == "txt")
-    {
-        int pos = path_to_depth.find_last_of('/');
-        path_to_depth = path_to_depth.substr(0, pos + 1);
-    }
-
-    if (!use_webcam && path_to_images.back() != '/')
-        path_to_images += "/";
-    if (!use_webcam && path_to_depth.back() != '/')
-        path_to_depth += "/";
+    string path_to_associate = string(argv[3]);
+    std::string detections_file(argv[4]);
+    std::string categories_to_ignore_file(argv[5]);
+    string reloc_mode = string(argv[6]);
+    string output_name = string(argv[7]);
 
     string output_folder = output_name;
     if (output_folder.back() != '/')
@@ -104,19 +73,22 @@ int main(int argc, char **argv)
     fs::create_directories(output_folder);
 
     // Load categories to ignore
-    std::ifstream fin(categories_to_ignore_file);
     vector<int> classes_to_ignore;
-    if (!fin.is_open())
+    if (categories_to_ignore_file != "null")
     {
-        std::cout << "Warning !! Failed to open the file with ignore classes. No class will be ignore.\n";
-    }
-    else
-    {
-        int cat;
-        while (fin >> cat)
+        std::ifstream fin(categories_to_ignore_file);
+        if (!fin.is_open())
         {
-            std::cout << "Ignore category: " << cat << "\n";
-            classes_to_ignore.push_back(cat);
+            std::cout << "Warning !! Failed to open the file with ignore classes. No class will be ignore.\n";
+        }
+        else
+        {
+            int cat;
+            while (fin >> cat)
+            {
+                std::cout << "Ignore category: " << cat << "\n";
+                classes_to_ignore.push_back(cat);
+            }
         }
     }
 
@@ -156,32 +128,14 @@ int main(int argc, char **argv)
     }
 
     // Load images
-    cv::VideoCapture cap;
-    Fr2DeskDataset dataset(path_to_images, path_to_depth);
-    int nImages = 0;
-    if (!use_webcam)
-    {
-        dataset.init();
-        nImages = dataset.get_max_image_index();
-        cout << "Loaded " << dataset.get_max_image_index() << " images\n";
-    }
-    else
-    {
-        if (cap.open(webcam_id))
-        {
-            std::cout << "Opened webcam: " << webcam_id << "\n";
-            cap.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-            cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-        }
-        else
-        {
-            std::cerr << "Failed to open webcam: " << webcam_id << "\n";
-            return -1;
-        }
-    }
+    TUMDataset dataset(path_to_associate);
+    dataset.init();
+    int nImages = dataset.get_max_image_index();
+    nImages = dataset.get_max_image_index();
+    cout << "Loaded " << dataset.get_max_image_index() << " images\n";
 
     // Create system
-    ORB_SLAM2::System::eSensor sensor = true ? ORB_SLAM2::System::MONOCULAR : ORB_SLAM2::System::RGBD;
+    ORB_SLAM2::System::eSensor sensor = ORB_SLAM2::System::RGBD;
     ORB_SLAM2::System SLAM(vocabulary_file, parameters_file, sensor, true, true, false);
     SLAM.SetRelocalizationMode(relocalization_mode);
 
@@ -206,29 +160,19 @@ int main(int argc, char **argv)
     filenames.reserve(nImages);
     std::vector<double> timestamps;
     timestamps.reserve(nImages);
-    int ni = 0;
     Frame frame;
     double timestamp=0;
     while (1)
     {
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
         std::string filename;
-        if (use_webcam)
-        {
-            cap >> im; // get image from webcam
-            filename = "frame_" + std::to_string(ni) + ".png";
-        }
-        else
-        {
-            if (!dataset.HasNext())
-                break;
-            timestamp = dataset.NextFrame(frame);
-            im = frame[0];
-            imDepth = frame[1];
-            filename = dataset.get_filename();
-        }
-        double tframe = ni < dataset.get_max_image_index() ? timestamp : std::time(nullptr);
-        timestamps.push_back(tframe);
+        if (!dataset.HasNext())
+            break;
+        timestamp = dataset.NextFrame(frame);
+        im = frame[0];
+        imDepth = frame[1];
+        filename = dataset.get_filename();
+        timestamps.push_back(timestamp);
         if (im.empty())
         {
             cerr << endl
@@ -250,10 +194,7 @@ int main(int argc, char **argv)
 
         // Pass the image and detections to the SLAM system
         cv::Mat m;
-        if (true)
-            m = SLAM.TrackMonocular(im, tframe, detections, false);
-        else
-            m = SLAM.TrackRGBD(im, imDepth, tframe, detections, false);
+        m = SLAM.TrackRGBD(im, imDepth, timestamp, detections, false);
 
         if (m.rows && m.cols)
             poses.push_back(ORB_SLAM2::cvToEigenMatrix<double, float, 4, 4>(m));
@@ -266,10 +207,6 @@ int main(int argc, char **argv)
         std::cout << "time = " << ttrack << "\n";
 
         if (SLAM.ShouldQuit())
-            break;
-
-        ++ni;
-        if (ni >= nImages)
             break;
     }
 

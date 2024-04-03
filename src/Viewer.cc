@@ -45,6 +45,7 @@
 #include <unistd.h>
 
 #include "ARViewer.h"
+#include "PointCloudMapping.h"
 
 namespace ORB_SLAM2
 {
@@ -101,6 +102,8 @@ void Viewer::Run()
     pangolin::Var<bool> menuLocalizationMode("menu.Localization Mode",false,true);
     pangolin::Var<bool> menuReset("menu.Reset",false,false);
     pangolin::Var<bool> menuPause("menu.Pause",false,true);
+    pangolin::Var<bool> menuShowMesh("menu.Show Mesh",true,true);
+    pangolin::Var<bool> menuShowPointCloud("menu.Show PointCloud",true,true);
     pangolin::Var<bool> menuCatCol("menu.Color by Cat", false, true);
     pangolin::Var<bool> menu3DBbox("menu.Disp 3D Bboxes", false, true);
     pangolin::Var<bool> menuDistEstim("menu.Disp Distance Est.", false, true);
@@ -171,7 +174,10 @@ void Viewer::Run()
             mpMapDrawer->DrawMapObjectsPoints(menuObjectsPointsSize);
         if (menuShowObjects)
             mpMapDrawer->DrawMapObjects();
-
+        if (menuShowMesh)
+            PointCloudMapping::GetSingleton()->DrawMesh();
+        if (menuShowPointCloud)
+            PointCloudMapping::GetSingleton()->DrawPointCloud(menuPointsSize);
         if (menuDistEstim)
             mpMapDrawer->DrawDistanceEstimation(mpTracker->GetCurrentMeanDepth(), mpTracker->mCurrentFrame.mTcw);
 

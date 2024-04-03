@@ -151,7 +151,7 @@ Eigen::Matrix<double, Eigen::Dynamic, 3> generate_ellipsoid_points(int azimuths,
 }
 
 Eigen::Matrix<double, Eigen::Dynamic, 3> Ellipsoid::base_ellipsoid_pts = generate_ellipsoid_points(8, 8, 50);
-
+//  TODO: reconstruct Presision Object Shape
 Eigen::Matrix<double, Eigen::Dynamic, 3> Ellipsoid::GeneratePointCloud(int sampling) const {
     Eigen::Matrix<double, Eigen::Dynamic, 3> pts;
     if (sampling == 50) {

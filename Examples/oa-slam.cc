@@ -32,6 +32,7 @@
 #include <experimental/filesystem>
 #include "Utils.h"
 #include "dataset.hpp"
+#include "PointCloudMapping.h"
 
 using json = nlohmann::json;
 
@@ -44,7 +45,7 @@ int main(int argc, char **argv)
     srand(time(nullptr));
     std::cout << "C++ version: " << __cplusplus << std::endl;
 
-    if (argc != 8)
+    if (argc != 10)
     {
         cerr << endl
              << "Usage:\n"
@@ -55,7 +56,9 @@ int main(int argc, char **argv)
                 "      detections_file (.json file with detections or .onnx yolov5 weights)\n"
                 "      categories_to_ignore_file (file containing the categories to ignore (one category_id per line))\n"
                 "      relocalization_mode ('points', 'objects' or 'points+objects')\n"
-                "      output_name \n";
+                "      output folder\n"
+                "      output_name \n"
+                "      use_depth (0 or 1)\n";
         return 1;
     }
 
@@ -65,9 +68,10 @@ int main(int argc, char **argv)
     std::string detections_file(argv[4]);
     std::string categories_to_ignore_file(argv[5]);
     string reloc_mode = string(argv[6]);
-    string output_name = string(argv[7]);
+    string output_folder = string(argv[7]);
+    string output_name = string(argv[8]);
+    bool use_depth = std::stoi(argv[9])==1;
 
-    string output_folder = output_name;
     if (output_folder.back() != '/')
         output_folder += "/";
     fs::create_directories(output_folder);
@@ -135,7 +139,7 @@ int main(int argc, char **argv)
     cout << "Loaded " << dataset.get_max_image_index() << " images\n";
 
     // Create system
-    ORB_SLAM2::System::eSensor sensor = ORB_SLAM2::System::RGBD;
+    ORB_SLAM2::System::eSensor sensor = use_depth ? ORB_SLAM2::System::RGBD : ORB_SLAM2::System::MONOCULAR;
     ORB_SLAM2::System SLAM(vocabulary_file, parameters_file, sensor, true, true, false);
     SLAM.SetRelocalizationMode(relocalization_mode);
 
@@ -194,7 +198,10 @@ int main(int argc, char **argv)
 
         // Pass the image and detections to the SLAM system
         cv::Mat m;
-        m = SLAM.TrackRGBD(im, imDepth, timestamp, detections, false);
+        if(use_depth)
+            m = SLAM.TrackRGBD(im, imDepth, timestamp, detections, false);
+        else
+            m = SLAM.TrackMonocular(im, timestamp, detections, false);
 
         if (m.rows && m.cols)
             poses.push_back(ORB_SLAM2::cvToEigenMatrix<double, float, 4, 4>(m));
@@ -271,6 +278,7 @@ int main(int argc, char **argv)
     SLAM.SaveMapPointsOBJ(output_folder + "map_points_" + output_name + ".obj");
     SLAM.SaveMapObjectsOBJ(output_folder + "map_objects_" + output_name + ".obj");
     SLAM.SaveMapObjectsTXT(output_folder + "map_objects_" + output_name + ".txt");
+    ORB_SLAM2::PointCloudMapping::GetSingleton()->saveMesh(output_folder, output_name);
     std::cout << "\n";
 
     // Save a reloadable map

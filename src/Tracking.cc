@@ -70,7 +70,7 @@
 #include <unistd.h>
 #include <dlib/optimization/max_cost_assignment.h>
 #include <chrono>
-
+#include "PointCloudMapping.h"
 using namespace std;
 
 using std::chrono::high_resolution_clock;
@@ -287,6 +287,11 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
     // Track();
     GrabObject(imRGB, detections, force_relocalize);
 
+    //relocalisation mode
+    if(mCurrentFrame.mnId%5==0 && (!mCurrentFrame.mTcw.empty())){
+        Frame F = mCurrentFrame;
+        PointCloudMapping::GetSingleton()->insertcurrentFrame(F,imRGB,imD);
+    }
     return mCurrentFrame.mTcw.clone();
 }
 

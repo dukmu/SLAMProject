@@ -110,6 +110,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR, use_objects_in_local_BA);
     mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
 
+    point_cloud_mapper_ = new PointCloudMapping(this, 0.01, strSettingsFile);
+
     //Initialize the Local Mapping thread and launch
     local_object_mapper_ = nullptr;
     if (use_objects_in_local_BA <= 1) {
@@ -395,10 +397,17 @@ void System::Shutdown()
 {
     mpLocalMapper->RequestFinish();
     mpLoopCloser->RequestFinish();
+    point_cloud_mapper_->requestFinish();
+    while (!point_cloud_mapper_->isFinished())
+    {
+        usleep(5000);
+    }
+    
     if (local_object_mapper_) local_object_mapper_->RequestFinish();
     if (mpARViewer) mpARViewer->RequestFinish();
     if(mpViewer)
     {
+        mpViewer->RequestFinish();
         // mpViewer->RequestFinish();
         while(!mpViewer->isFinished())
             usleep(5000);

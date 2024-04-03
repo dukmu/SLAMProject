@@ -25,6 +25,13 @@ Camera.RGB: 1
 Camera.width: 640
 Camera.height: 480
 
+Camera.bf: 40.0
+DepthMapFactor: 5208.0
+
+voxel_size: 0.02
+sdf_trunc: 0.2
+space_carving: 1
+
 #--------------------------------------------------------------------------------------------
 # ORB Parameters
 #--------------------------------------------------------------------------------------------
@@ -44,6 +51,8 @@ ORBextractor.nLevels: 8
 # You can lower these values if your images have low contrast			
 ORBextractor.iniThFAST: 20
 ORBextractor.minThFAST: 7
+
+ThDepth: 40.0
 
 #--------------------------------------------------------------------------------------------
 # Viewer Parameters

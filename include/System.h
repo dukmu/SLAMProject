@@ -57,6 +57,8 @@
 #include "ORBVocabulary.h"
 #include <unistd.h>
 
+#include "PointCloudMapping.h"
+
 namespace ORB_SLAM2
 {
 
@@ -69,6 +71,7 @@ class LocalMapping;
 class LocalObjectMapping;
 class LoopClosing;
 class Detection;
+class PointCloudMapping;
 
 
 enum enumRelocalizationMode {
@@ -243,6 +246,8 @@ public:
 
     double relocalization_duration = -1;
     bool relocalization_status = false;
+
+    PointCloudMapping* point_cloud_mapper_;
 };
 
 }// namespace ORB_SLAM

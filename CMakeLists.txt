@@ -8,7 +8,7 @@ ENDIF()
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -faligned-new -Wall -Wno-deprecated-declarations -O3 -march=native")
+set(CMAKE_CXX_FLAGS "-std=c++17 -faligned-new -Wno-deprecated-declarations -O3 -march=native")
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
@@ -37,55 +37,30 @@ add_subdirectory(Thirdparty/json)
 # Dlib
 find_package(dlib REQUIRED)
 
+
+set(PCL_DIR "/usr/local/share/pcl-1.14")
+FIND_PACKAGE(PCL 1.14 REQUIRED)
+find_package(VDBFusion REQUIRED)
+
 include_directories(
 ${PROJECT_SOURCE_DIR}
 ${PROJECT_SOURCE_DIR}/include
 ${EIGEN3_INCLUDE_DIR}
 ${Pangolin_INCLUDE_DIRS}
 ${PROTOBUF_INCLUDE_DIR}
+${PCL_INCLUDE_DIRS}
+${VDBFusion_INCLUDE_DIRS}
 )
+
+add_definitions( ${PCL_DEFINITIONS} )
+link_directories( ${PCL_LIBRARY_DIRS} )
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
-add_library(${PROJECT_NAME} SHARED
-src/System.cc
-src/Tracking.cc
-src/LocalMapping.cc
-src/LoopClosing.cc
-src/ORBextractor.cc
-src/ORBmatcher.cc
-src/FrameDrawer.cc
-src/Converter.cc
-src/MapPoint.cc
-src/KeyFrame.cc
-src/Map.cc
-src/MapDrawer.cc
-src/Optimizer.cc
-src/PnPsolver.cc
-src/Frame.cc
-src/KeyFrameDatabase.cc
-src/Sim3Solver.cc
-src/Initializer.cc
-src/Viewer.cc
-src/Osmap.cpp
-src/osmap.pb.cc
-src/ImageDetections.cc
-src/Ellipse.cc
-src/Ellipsoid.cc
-src/ObjectTrack.cc
-src/Distance.cc
-src/MapObject.cc
-src/OptimizerObject.cc
-src/LocalObjectMapping.cc
-src/Utils.cc
-src/ColorManager.cc
-src/Reconstruction.cc
-src/Camera.cc
-src/Scene.cc
-src/p3p.cc
-src/Localization.cc
-src/ARViewer.cc
-)
+
+file(GLOB SRC_FILES "src/*.cc" "src/*.cpp")
+message("SRC_FILES: ${SRC_FILES}")
+add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
 
 target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBS}
@@ -97,6 +72,8 @@ ${PROTOBUF_LIBRARIES}
 nlohmann_json::nlohmann_json
 stdc++fs
 dlib::dlib
+${PCL_LIBRARIES}
+VDBFusion::vdbfusion
 )
 
 
@@ -108,8 +85,3 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 add_executable(oa-slam
 Examples/oa-slam.cc Examples/dataset.cc)
 target_link_libraries(oa-slam ${PROJECT_NAME})
-
-add_executable(oa-slam_localization
-Examples/oa-slam_localization.cc)
-target_link_libraries(oa-slam_localization ${PROJECT_NAME})
-

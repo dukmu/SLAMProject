@@ -16,7 +16,9 @@
                 "../Data/detections_yolov5_tum_rgbd_fr2_desk.json",
                 "null",
                 "points+objects",
-                "../fr2_output"
+                "../fr2_output",
+                "test",
+                "1"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",

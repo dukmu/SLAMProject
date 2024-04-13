@@ -132,7 +132,7 @@ bool ObjectTrack::ReconstructFromLandmarks(Map* map)
     return true;
 }
 
-
+//DUMU not work
 bool ObjectTrack::ReconstructCrocco(bool use_two_passes)
 {
     if (this->GetAngularDifference() < TO_RAD(10.0)) {
@@ -160,7 +160,7 @@ bool ObjectTrack::ReconstructCrocco(bool use_two_passes)
 }
 
 
-bool ObjectTrack::ReconstructFromCenter(bool use_keyframes)
+bool ObjectTrack::ReconstructFromCenter(bool use_keyframes) // for init
 {
     if (this->GetAngularDifference() < TO_RAD(10.0)) {
         //std::cerr << "Impossible to triangulate the center: not enough angular difference.\n";

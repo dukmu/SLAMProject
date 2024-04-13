@@ -73,7 +73,7 @@ public:
 
     bool ReconstructFromLandmarks(Map* map);
     bool ReconstructCrocco(bool use_two_passes=true);
-    bool ReconstructFromCenter(bool use_keyframes=false);
+    bool ReconstructFromCenter(bool use_keyframes=false); //DUMU for init
     bool ReconstructFromSamplesEllipsoid();
     bool ReconstructFromSamplesCenter();
 

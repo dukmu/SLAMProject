@@ -58,7 +58,7 @@ int main(int argc, char **argv)
                 "      relocalization_mode ('points', 'objects' or 'points+objects')\n"
                 "      output folder\n"
                 "      output_name \n"
-                "      use_depth (0 or 1)\n";
+                "      runtype ( normal or relocalization map file path)\n";
         return 1;
     }
 
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     string reloc_mode = string(argv[6]);
     string output_folder = string(argv[7]);
     string output_name = string(argv[8]);
-    bool use_depth = std::stoi(argv[9])==1;
+    string runtype = string(argv[9]);
 
     if (output_folder.back() != '/')
         output_folder += "/";
@@ -139,7 +139,7 @@ int main(int argc, char **argv)
     cout << "Loaded " << dataset.get_max_image_index() << " images\n";
 
     // Create system
-    ORB_SLAM2::System::eSensor sensor = use_depth ? ORB_SLAM2::System::RGBD : ORB_SLAM2::System::MONOCULAR;
+    ORB_SLAM2::System::eSensor sensor = ORB_SLAM2::System::RGBD;
     ORB_SLAM2::System SLAM(vocabulary_file, parameters_file, sensor, true, true, false);
     SLAM.SetRelocalizationMode(relocalization_mode);
 
@@ -154,7 +154,12 @@ int main(int argc, char **argv)
          << endl;
 
     ORB_SLAM2::Osmap osmap = ORB_SLAM2::Osmap(SLAM);
-
+    
+    if (runtype != "normal")
+    {
+        osmap.mapLoad(runtype);
+        SLAM.ActivateLocalizationMode();
+    }
     // Main loop
     cv::Mat im;
     cv::Mat imDepth;
@@ -197,11 +202,7 @@ int main(int argc, char **argv)
         }
 
         // Pass the image and detections to the SLAM system
-        cv::Mat m;
-        if(use_depth)
-            m = SLAM.TrackRGBD(im, imDepth, timestamp, detections, false);
-        else
-            m = SLAM.TrackMonocular(im, timestamp, detections, false);
+        cv::Mat m = SLAM.TrackRGBD(im, imDepth, timestamp, detections, false);
 
         if (m.rows && m.cols)
             poses.push_back(ORB_SLAM2::cvToEigenMatrix<double, float, 4, 4>(m));
@@ -223,8 +224,7 @@ int main(int argc, char **argv)
     // Save camera tracjectory
 
     // TXT files
-    std::ofstream file(output_folder + "camera_poses_" + output_name + ".txt");
-    std::ofstream file_tum(output_folder + "camera_poses_" + output_name + "_tum.txt"); // output poses in the TUM RGB-D format
+    std::ofstream file(output_folder + "/" + output_name + "/CameraTrajectory.txt");
     json json_data;
     for (unsigned int i = 0; i < poses.size(); ++i)
     {
@@ -232,10 +232,6 @@ int main(int argc, char **argv)
         Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
         pose.block<3, 3>(0, 0) = m.block<3, 3>(0, 0).transpose();
         pose.block<3, 1>(0, 3) = -m.block<3, 3>(0, 0).transpose() * m.block<3, 1>(0, 3);
-
-        file << i << " " << pose(0, 0) << " " << pose(0, 1) << " " << pose(0, 2) << " " << pose(0, 3) << " "
-             << pose(1, 0) << " " << pose(1, 1) << " " << pose(1, 2) << " " << pose(1, 3) << " "
-             << pose(2, 0) << " " << pose(2, 1) << " " << pose(2, 2) << " " << pose(2, 3) << "\n";
 
         json R({{m(0, 0), m(0, 1), m(0, 2)},
                 {m(1, 0), m(1, 1), m(1, 2)},
@@ -249,40 +245,31 @@ int main(int argc, char **argv)
 
         auto q = Eigen::Quaterniond(pose.block<3, 3>(0, 0));
         auto p = pose.block<3, 1>(0, 3);
-        file_tum << std::fixed << timestamps[i] << " " << p[0] << " " << p[1] << " " << p[2] << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+        file << std::fixed << timestamps[i] << " " << p[0] << " " << p[1] << " " << p[2] << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
     }
     file.close();
-    file_tum.close();
 
     // JSON files
-    std::ofstream json_file(output_folder + "camera_poses_" + output_name + ".json");
+    std::ofstream json_file(output_folder + "/" + output_name + "/CameraTrajectory.json");
     json_file << json_data;
     json_file.close();
 
     // Tracking time statistics
     sort(vTimesTrack.begin(), vTimesTrack.end());
-    float totaltime = 0;
-    for (int ni = 0; ni < nImages; ni++)
-    {
-        totaltime += vTimesTrack[ni];
-    }
-    cout << "-------" << endl
-         << endl;
-    cout << "median tracking time: " << vTimesTrack[nImages / 2] << endl;
-    cout << "mean tracking time: " << totaltime / nImages << endl
-         << endl;
+    std::cout << "Average tracking time: " << accumulate(vTimesTrack.begin(), vTimesTrack.end(), 0.0) / vTimesTrack.size() << "\n";
+    std::cout << "Fastest tracking time: " << vTimesTrack.front() << "\n";
+    std::cout << "Slowest tracking time: " << vTimesTrack.back() << "\n";
 
     // Save camera trajectory, points and objects
-    SLAM.SaveKeyFrameTrajectoryTUM(output_folder + "keyframes_poses_" + output_name + "_tum.txt");
-    SLAM.SaveKeyFrameTrajectoryJSON(output_folder + "keyframes_poses_" + output_name + ".json", filenames);
-    SLAM.SaveMapPointsOBJ(output_folder + "map_points_" + output_name + ".obj");
-    SLAM.SaveMapObjectsOBJ(output_folder + "map_objects_" + output_name + ".obj");
-    SLAM.SaveMapObjectsTXT(output_folder + "map_objects_" + output_name + ".txt");
-    ORB_SLAM2::PointCloudMapping::GetSingleton()->saveMesh(output_folder, output_name);
+    SLAM.SaveKeyFrameTrajectoryTUM(output_folder + "/" + output_name + "/KeyFrameTrajectory.txt");
+    SLAM.SaveKeyFrameTrajectoryJSON(output_folder + "/" + output_name + "/KeyFrameTrajectory.json", filenames);
+    SLAM.SaveMapPointsOBJ(output_folder + "/" + output_name + "/MapPoints.obj");
+    SLAM.SaveMapObjectsOBJ(output_folder + "/" + output_name + "/MapObjects.obj");
+    ORB_SLAM2::PointCloudMapping::GetSingleton()->saveMesh(output_folder + "/" + output_name+"/", output_name);
     std::cout << "\n";
 
     // Save a reloadable map
-    osmap.mapSave(output_folder + "map_" + output_name);
+    osmap.mapSave(output_folder + "/" + output_name + "/Map.osmap");
 
     return 0;
 }

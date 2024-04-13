@@ -5,20 +5,54 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) 启动",
+            "name": "system on fr2desk",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/oa-slam",
             "args": [
-                "../Vocabulary/ORBvoc.txt",
-                "../Cameras/TUM2.yaml",
-                "../../rgbd_dataset_freiburg2_desk/associate.txt",
-                "../Data/detections_yolov5_tum_rgbd_fr2_desk.json",
+                "./Vocabulary/ORBvoc.txt",
+                "./Cameras/TUM2.yaml",
+                "../rgbd_dataset_freiburg2_desk/associate.txt",
+                "~/Repo/yolov5m_320.onnx",
                 "null",
                 "points+objects",
-                "../fr2_output",
+                "./output",
                 "test",
-                "1"
+                "normal"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "将反汇编风格设置为 Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "system on fr3office",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/oa-slam",
+            "args": [
+                "./Vocabulary/ORBvoc.txt",
+                "./Cameras/TUM2.yaml",
+                "../rgbd_dataset_freiburg3_long_office_household/associate.txt",
+                "~/Repo/yolov5m_320.onnx",
+                "null",
+                "points+objects",
+                "./output",
+                "test",
+                "normal"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",

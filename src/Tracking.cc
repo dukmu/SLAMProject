@@ -558,7 +558,7 @@ void Tracking::GrabObject(const cv::Mat &im,
 
 
                 if (!mbOnlyTracking) {
-                    for (auto& tr : objectTracks_) {
+                    for (auto& tr : objectTracks_) { //DUMU ?why only initialized tracks? why do it twice?
                         if (tr->GetLastObsFrameId() == current_frame_idx_) {
                             // Try reconstruct from points
                             if ((tr->GetNbObservations() > 10 && tr->GetStatus() == ObjectTrackStatus::ONLY_2D) ||
@@ -1770,7 +1770,7 @@ void Tracking::UpdateLocalKeyFrames()
         mCurrentFrame.mpReferenceKF = mpReferenceKF;
     }
 }
-
+//DUMU relocalization from objects
 bool Tracking::RelocalizationFromObjects(bool use_points)
 {
     std::vector<BBox2, Eigen::aligned_allocator<BBox2>> bboxes;

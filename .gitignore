@@ -1,5 +1,7 @@
-build/**
+**/build/**
 *.so
 Thirdparty/**
 bin/**
 lib/**
+**/devel/**
+output/**

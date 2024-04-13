@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.25)
 cmake_policy(SET CMP0048 NEW)
 project(ORB_SLAM2)
 
@@ -12,16 +12,12 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -faligned-new -Wno-deprecated-declarations -O3 -
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV 4.9 REQUIRED)
 if(NOT OpenCV_FOUND)
    message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
 else()
-   if(NOT "${OpenCV_VERSION_MAJOR}" STREQUAL "4")
-      message(WARNING "OpenCV 4 is required for dnn module. Object detector will not be available.")
-   else()
-      message("OpenCV 4 found. Make sure OpenCV is built with dnn module and CUDA.")
-      add_definitions(-DUSE_DNN)
-   endif()
+   message("OpenCV 4 found. Make sure OpenCV is built with dnn module and CUDA.")
+   add_definitions(-DUSE_DNN)
 endif()
 
 
@@ -85,3 +81,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 add_executable(oa-slam
 Examples/oa-slam.cc Examples/dataset.cc)
 target_link_libraries(oa-slam ${PROJECT_NAME})
+
+# Build ros
+# source ros setup
+add_subdirectory(Examples/rgbd_ros)

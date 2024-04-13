@@ -36,7 +36,7 @@ void try_create_dir(const std::string& dir)
 
 std::vector<std::string> rgb_files, depth_files;
 std::vector<double> timestamps, timestrack;
-std::vector<Eigen::Matrix4d> poses;
+std::vector<Eigen::Matrix4d, Eigen::aligned_allocator<Eigen::Matrix4d>> poses;
 class Callback{
 private:
     ORB_SLAM2::System *slam;
@@ -136,10 +136,10 @@ int main(int argc, char** argv)
         {
             std::cout << "Failed to open ignore file" << std::endl;
         }else{
-            std::string line;
-            while(std::getline(ignore_file, line))
+            int i;
+            while(ignore_file >> i)
             {
-                ignore_categories.push_back(std::stoi(line));
+                ignore_categories.push_back(i);
             }
         }
     }
@@ -180,8 +180,8 @@ int main(int argc, char** argv)
     ros::NodeHandle nh;
     Callback callback(&SLAM, detections_manager.get(), &osmap, output_path, data_name, save_images);
     sleep(3);
-    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/camera/depth/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_color", 1);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/camera/depth/image", 1);
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> MySyncPolicy;
     message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), rgb_sub, depth_sub);
     sync.registerCallback(boost::bind(&Callback::grab_rgbd, &callback, _1, _2));

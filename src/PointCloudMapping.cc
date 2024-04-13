@@ -6,6 +6,7 @@
 
 #include <pcl/PCLPointCloud2.h>
 #include <pangolin/pangolin.h>
+#include <glog/logging.h>
 
 using namespace cv;
 using namespace std;
@@ -30,10 +31,10 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         mFy = config["Camera.fy"];
         mbShutdown = false;
         mbFinish = true;
-        cout<<"vdbfusion initialize!"<<endl;
 
         // Dataset specific configuration
         openvdb::initialize();
+        LOG(INFO) <<"Vdbfusion initialize!"<<endl;
         // 参数设置，其中
         // voxel_size_ 体素大小
         // sdf_trunc_  sdf截断距离
@@ -56,10 +57,12 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         mbShutdown = true;
         vdbfuThread->join();
         PCThread->join();
+        LOG(INFO) << "PointCloudMapping release";
     }
 
     void PointCloudMapping::requestFinish()
     {
+        LOG(INFO) << "PointCloudMapping request finish";
         mbShutdown = true;
     }
 
@@ -72,21 +75,22 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
     {
         mSDFFrameQueue.push({color.clone(), depth.clone(), kf->GetPose(), 1.0});
 
-        cout << "receive a keyframe, id = " << kf->mnId << endl;
+        LOG(INFO) << "receive a keyframe, frameid = " << kf->mnFrameId << ", keyframeid="<<kf->mnId;
     }
 
     void PointCloudMapping::insertcurrentFrame(Frame &fr, const cv::Mat& color, const cv::Mat& depth)
     {
         mSDFFrameQueue.push({color.clone(), depth.clone(), fr.mTcw.clone(), 1.0});
-        cout << "receive currentframe, id = "<<fr.mnId << endl;
+        LOG(INFO) << "receive a current frame, frameid = " << fr.mnId;
     }
 
     void PointCloudMapping::generateMeshAndPointCloud()
     {
         while (!mbShutdown)
         {
-            auto [vertices, triangles, colors] = Tsdf_Volume->ExtractTriangleMesh(true, 0.5);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::chrono::steady_clock::time_point T1 = std::chrono::steady_clock::now();
+            auto [vertices, triangles, colors] = Tsdf_Volume->ExtractTriangleMesh(true, 0.5);
             mMutexMeshData.lock();
             mVertices = vertices;
             mTriangles = triangles;
@@ -94,6 +98,9 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
             // copy mPointCloud to mPointCloudMap
             mPointCloudMap = *mPointCloud;
             mMutexMeshData.unlock();
+            std::chrono::steady_clock::time_point T2 = std::chrono::steady_clock::now();
+            double T = std::chrono::duration_cast<std::chrono::duration<double>>(T2 - T1).count();
+            LOG(INFO) << "ExtractTriangleMesh Cost = " << T << " s";
         }
     }
 
@@ -136,13 +143,13 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         string pc_path = save_path+"pointcloud_"+save_name+".ply";
         string mesh_path = save_path+"mesh_"+save_name+".ply";
         pcl::io::savePLYFile(pc_path, *mPointCloud);
-        cout << "Saving pointcloud to :  " << pc_path << endl;
+        LOG(INFO) << "Saving dense pointcloud to :  " << pc_path;
 
         auto [vertices, triangles, colors] =
             Tsdf_Volume->ExtractTriangleMesh(true, 0.5);
 
         colormeshwrite(mesh_path,vertices,colors,triangles);
-        cout<<"Saving mesh to: " << mesh_path << endl;
+        LOG(INFO) <<"Saving mesh to: " << mesh_path;
     }
 
     void PointCloudMapping::vdbfu() // 对重定位过程中普通帧进行重建
@@ -155,10 +162,12 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
 
             if (mbShutdown)
             {
+                LOG(INFO) << "Vdbfusion thread shutdown";
                 break;
             }
             if (mSDFFrameQueue.empty())
             {
+                LOG(INFO) << "Vdbfusion thread wait for frame";
                 continue;
             }
             static float weight = 1.0;
@@ -168,31 +177,17 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
                 cv::Mat colorImg = frame.color;
                 cv::Mat depthImg = frame.depth;
                 cv::Mat pose = frame.pose;
-                // print pose
-                cout << "pose: " << pose << endl;
+                
                 id = frame.id;
                 weight = frame.weight;
+                LOG(INFO) << "Vdbfusion thread process frame " << id;
 
-                Eigen::Matrix4d pos = ORB_SLAM2::cvToEigenMatrix<double, float, 4, 4>(pose).inverse();
-                origin = pos.block<3, 1>(0, 3);
-                if (origin_last[2] == Eigen::Infinity)
-                {
-                    origin_last = origin;
-                }
-                double dis = (origin - origin_last).norm();
-                cout << dis << endl;
-                if (dis > 0.5)
-                { // 相机运动过于剧烈，跳过该帧
-                    std::cout << "SKIP FRAME" << std::endl;
-                    continue;
-                };
-                origin_last = origin;
                 std::unique_lock<std::mutex> locker(mPointCloudMtx);
-                generatePointCloud(colorImg, depthImg, pose, id);
+                generatePointCloud(colorImg, depthImg, pose);
                 locker.unlock();
             }
             std::unique_lock<std::mutex> locker(mPointsMtx);
-            cout << "points' numbers:" << mPoints.size() << endl;
+            LOG(INFO) << "Integrate Point number " << mPoints.size();
             std::chrono::steady_clock::time_point T1 = std::chrono::steady_clock::now();
             Tsdf_Volume->Integrate(mPoints, mPointcolors, origin, [](float sdf /*unused*/)
                                    { return weight; });
@@ -200,17 +195,16 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
             std::chrono::steady_clock::time_point T2 = std::chrono::steady_clock::now();
             double T = std::chrono::duration_cast<std::chrono::duration<double>>(T2 - T1).count();
             locker.unlock();
-            std::cout << "Integrate " << id << " Cost = " << T << std::endl;
+            LOG(INFO) << "Integrate Cost = " << T;
         }
 
         mbFinish = true;
     }
 
-    void PointCloudMapping::generatePointCloud(const cv::Mat& imRGB, const cv::Mat& imD, const cv::Mat& pose, int nId)
+    void PointCloudMapping::generatePointCloud(const cv::Mat& imRGB, const cv::Mat& imD, const cv::Mat& pose)
     {
         mPoints.clear();
         mPointcolors.clear();
-        std::cout << "Converting image: " << nId << endl;
         PointCloud::Ptr current(new PointCloud);
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
         for(size_t v = 0; v < imRGB.rows ; v+=3){
@@ -263,18 +257,18 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         (*mPointCloud) += *current;
         mPointCloud->is_dense = true;
         // 加入新的点云后，对整个点云进行体素滤波
-        std::cout<<"size of mPointCloud is" << mPointCloud->points.size()<<std::endl;
+        LOG(INFO) <<"Size of mPointCloud is" << mPointCloud->points.size();
         voxel.setInputCloud(mPointCloud);
         voxel.setLeafSize(0.05f,0.05f,0.05f);
         voxel.filter(*transformed);
-        std::cout<<"size of transformed is" << transformed->points.size()<<std::endl;
+        LOG(INFO) <<"Size of mPointCloud merged is" << transformed->points.size();
         mPointCloud->swap(*transformed);
         mPointCloud->is_dense = true;
         transformed->clear();
 
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
         double t = std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
-        std::cout << ", Cost = " << t << std::endl;
+        LOG(INFO) << "Generate PointCloud Cost = " << t << " s";
     }
 
 

@@ -8,7 +8,7 @@ ENDIF()
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -faligned-new -Wno-deprecated-declarations -O3 -march=native")
+set(CMAKE_CXX_FLAGS "-std=c++17 -faligned-new -Wno-deprecated-declarations -march=native")
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
@@ -20,7 +20,7 @@ else()
    add_definitions(-DUSE_DNN)
 endif()
 
-
+find_package(glog REQUIRED)
 
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
@@ -46,6 +46,7 @@ ${Pangolin_INCLUDE_DIRS}
 ${PROTOBUF_INCLUDE_DIR}
 ${PCL_INCLUDE_DIRS}
 ${VDBFusion_INCLUDE_DIRS}
+${GLOG_INCLUDE_DIRS}
 )
 
 add_definitions( ${PCL_DEFINITIONS} )
@@ -70,6 +71,7 @@ stdc++fs
 dlib::dlib
 ${PCL_LIBRARIES}
 VDBFusion::vdbfusion
+glog::glog
 )
 
 

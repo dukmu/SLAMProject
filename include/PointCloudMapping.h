@@ -67,7 +67,7 @@ namespace ORB_SLAM2 {
         vector<vector<Eigen::Vector3d>> mvPoints;
     private:
         void generateMeshAndPointCloud();
-        void generatePointCloud(const cv::Mat& imRGB, const cv::Mat& imD, const cv::Mat& pose, int nId);
+        void generatePointCloud(const cv::Mat& imRGB, const cv::Mat& imD, const cv::Mat& pose);
         void colormeshwrite(string plyname, vector<Eigen::Vector3d>& vertices, vector<Eigen::Vector3d>& colors, vector<Eigen::Vector3i>& triangles);
         double mCx, mCy, mFx, mFy, mResolution;
 

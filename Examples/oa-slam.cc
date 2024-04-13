@@ -33,6 +33,7 @@
 #include "Utils.h"
 #include "dataset.hpp"
 #include "PointCloudMapping.h"
+#include <glog/logging.h>
 
 using json = nlohmann::json;
 
@@ -42,6 +43,7 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
+    google::InitGoogleLogging(argv[0]);
     srand(time(nullptr));
     std::cout << "C++ version: " << __cplusplus << std::endl;
 
@@ -83,14 +85,14 @@ int main(int argc, char **argv)
         std::ifstream fin(categories_to_ignore_file);
         if (!fin.is_open())
         {
-            std::cout << "Warning !! Failed to open the file with ignore classes. No class will be ignore.\n";
+            LOG(WARNING) << "Warning !! Failed to open the file with ignore classes. No class will be ignore.\n";
         }
         else
         {
             int cat;
             while (fin >> cat)
             {
-                std::cout << "Ignore category: " << cat << "\n";
+                LOG(INFO) << "Ignore category: " << cat << "\n";
                 classes_to_ignore.push_back(cat);
             }
         }
@@ -112,7 +114,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        std::cout << "Invalid detection file. It should be .json or .onnx\n"
+        LOG(ERROR) << "Invalid detection file. It should be .json or .onnx\n"
                      "No detections will be obtained.\n";
     }
 
@@ -126,7 +128,7 @@ int main(int argc, char **argv)
         relocalization_mode = ORB_SLAM2::RELOC_OBJECTS_POINTS;
     else
     {
-        std::cerr << "Error: Invalid parameter for relocalization mode. "
+        LOG(FATAL) << "Error: Invalid parameter for relocalization mode. "
                      "It should be 'points', 'objects' or 'points+objects'.\n";
         return 1;
     }
@@ -136,7 +138,7 @@ int main(int argc, char **argv)
     dataset.init();
     int nImages = dataset.get_max_image_index();
     nImages = dataset.get_max_image_index();
-    cout << "Loaded " << dataset.get_max_image_index() << " images\n";
+    LOG(INFO) << "Loaded " << dataset.get_max_image_index() << " images\n";
 
     // Create system
     ORB_SLAM2::System::eSensor sensor = ORB_SLAM2::System::RGBD;
@@ -147,16 +149,14 @@ int main(int argc, char **argv)
     vector<float> vTimesTrack;
     vTimesTrack.reserve(nImages);
 
-    cout << endl
-         << "-------" << endl;
-    cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl
-         << endl;
+    LOG(INFO) << "Start processing sequence ...";
+    LOG(INFO) << "Images in the sequence: " << nImages;
 
     ORB_SLAM2::Osmap osmap = ORB_SLAM2::Osmap(SLAM);
     
     if (runtype != "normal")
     {
+        LOG(INFO)  << "Run in relocalization mode, "<< "Loading osmap:" << runtype;
         osmap.mapLoad(runtype);
         SLAM.ActivateLocalizationMode();
     }
@@ -176,7 +176,10 @@ int main(int argc, char **argv)
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
         std::string filename;
         if (!dataset.HasNext())
+        {
+            LOG(INFO)  << "All image processed";
             break;
+        }
         timestamp = dataset.NextFrame(frame);
         im = frame[0];
         imDepth = frame[1];
@@ -184,9 +187,7 @@ int main(int argc, char **argv)
         timestamps.push_back(timestamp);
         if (im.empty())
         {
-            cerr << endl
-                 << "Failed to load image: "
-                 << filename << endl;
+            LOG(ERROR) << "Failed to load image: " << filename;
             return 1;
         }
         filenames.push_back(filename);
@@ -212,17 +213,21 @@ int main(int argc, char **argv)
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
         double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
         vTimesTrack.push_back(ttrack);
-        std::cout << "time = " << ttrack << "\n";
+        LOG(INFO) << "Tracking " << filename << " took " << ttrack << " ms";
 
         if (SLAM.ShouldQuit())
+        {
+            LOG(INFO) << "Receive quit signal";
             break;
+        }
     }
 
     // Stop all threads
+    LOG(INFO) << "Shuting down slam";
     SLAM.Shutdown();
 
     // Save camera tracjectory
-
+    LOG(INFO) << "Saving file";
     // TXT files
     std::ofstream file(output_folder + "/" + output_name + "/CameraTrajectory.txt");
     json json_data;
@@ -254,22 +259,23 @@ int main(int argc, char **argv)
     json_file << json_data;
     json_file.close();
 
-    // Tracking time statistics
-    sort(vTimesTrack.begin(), vTimesTrack.end());
-    std::cout << "Average tracking time: " << accumulate(vTimesTrack.begin(), vTimesTrack.end(), 0.0) / vTimesTrack.size() << "\n";
-    std::cout << "Fastest tracking time: " << vTimesTrack.front() << "\n";
-    std::cout << "Slowest tracking time: " << vTimesTrack.back() << "\n";
-
     // Save camera trajectory, points and objects
     SLAM.SaveKeyFrameTrajectoryTUM(output_folder + "/" + output_name + "/KeyFrameTrajectory.txt");
     SLAM.SaveKeyFrameTrajectoryJSON(output_folder + "/" + output_name + "/KeyFrameTrajectory.json", filenames);
     SLAM.SaveMapPointsOBJ(output_folder + "/" + output_name + "/MapPoints.obj");
     SLAM.SaveMapObjectsOBJ(output_folder + "/" + output_name + "/MapObjects.obj");
     ORB_SLAM2::PointCloudMapping::GetSingleton()->saveMesh(output_folder + "/" + output_name+"/", output_name);
-    std::cout << "\n";
 
     // Save a reloadable map
     osmap.mapSave(output_folder + "/" + output_name + "/Map.osmap");
+
+    LOG(INFO) << "Saved";
+
+    // Tracking time statistics
+    sort(vTimesTrack.begin(), vTimesTrack.end());
+    LOG(INFO) << "Average tracking time: " << accumulate(vTimesTrack.begin(), vTimesTrack.end(), 0.0) / vTimesTrack.size() << "\n";
+    LOG(INFO) << "Fastest tracking time: " << vTimesTrack.front() << "\n";
+    LOG(INFO) << "Slowest tracking time: " << vTimesTrack.back() << "\n";
 
     return 0;
 }

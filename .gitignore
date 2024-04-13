@@ -5,3 +5,4 @@ bin/**
 lib/**
 **/devel/**
 output/**
+Vocabulary/ORBvoc.txt

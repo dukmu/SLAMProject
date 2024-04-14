@@ -35,6 +35,6 @@ private:
     std::vector<std::string> depth_list;
     std::vector<double> timestamps;
 
-    int current_image_index_ = 0;
+    int current_image_index_ = -1;
     int max_image_index_ = 0;
 };

@@ -89,7 +89,7 @@ void Viewer::Run()
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    pangolin::CreatePanel("menu").SetBounds(0.0,1.0,0.0,pangolin::Attach::Pix(175));
+    pangolin::CreatePanel("menu").SetBounds(0.2,1.0,0.0,pangolin::Attach::Pix(175));
     pangolin::Var<bool> menuFollowCamera("menu.Follow Camera",true,true);
     pangolin::Var<bool> menuShowCamera("menu.Show Camera",true,true);
     pangolin::Var<bool> menuShowPoints("menu.Show Points",true,true);
@@ -103,6 +103,7 @@ void Viewer::Run()
     pangolin::Var<bool> menuReset("menu.Reset",false,false);
     pangolin::Var<bool> menuPause("menu.Pause",false,true);
     pangolin::Var<bool> menuShowMesh("menu.Show Mesh",true,true);
+    pangolin::Var<bool> menuShowImages("menu.Show Images",true,true);
     pangolin::Var<bool> menuShowPointCloud("menu.Show PointCloud",true,true);
     pangolin::Var<bool> menuCatCol("menu.Color by Cat", false, true);
     pangolin::Var<bool> menu3DBbox("menu.Disp 3D Bboxes", false, true);
@@ -121,12 +122,17 @@ void Viewer::Run()
     pangolin::View& d_cam = pangolin::CreateDisplay()
             .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f/768.0f)
             .SetHandler(new pangolin::Handler3D(s_cam));
+    
+    pangolin::View& d_img = pangolin::Display("image")
+            .SetBounds(0, 0.2, 0, pangolin::Attach::Pix(175), -1024.0f/768.0f)
+            .SetLock(pangolin::LockLeft, pangolin::LockBottom).SetLock(pangolin::LockRight, pangolin::LockTop);
+    pangolin::GlTexture imgTexture(mImageWidth,mImageHeight,GL_RGB,false,0,GL_BGR,GL_UNSIGNED_BYTE);
 
     pangolin::OpenGlMatrix Twc;
     Twc.SetIdentity();
 
-    cv::namedWindow("OA-SLAM: Current Frame");
-
+    // cv::namedWindow("OA-SLAM: Current Frame");
+    
     bool bFollow = true;
     bool bLocalizationMode = false;
     int iter = 0;
@@ -183,15 +189,21 @@ void Viewer::Run()
 
         setARViewerProperties(menuDispARModels, menuARFixSize);
 
-        pangolin::FinishFrame();
-
         cv::Mat im = mpFrameDrawer->DrawFrame();
         if (menuShowObjects) {
             mpFrameDrawer->DrawDetections(im);
             mpFrameDrawer->DrawProjections(im);
         }
-        cv::imshow("OA-SLAM: Current Frame",im);
-        cv::waitKey(mT);
+        // cv::imshow("OA-SLAM: Current Frame",im);
+        // cv::waitKey(mT);
+        if (menuShowImages) {
+            imgTexture.Upload(im.data,GL_BGR,GL_UNSIGNED_BYTE);
+            d_img.Activate();
+            glColor3f(1.0,1.0,1.0);
+            imgTexture.RenderToViewportFlipY();
+        }
+
+        pangolin::FinishFrame();
 
         if(menuReset)
         {

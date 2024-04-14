@@ -39,17 +39,17 @@ void TUMDataset::init()
 double TUMDataset::NextFrame(Frame &f)
 {
     f.clear();
+    current_image_index_++;
     std::string img_name = data_path + img_list[current_image_index_];
     std::string depth_name = data_path + depth_list[current_image_index_];
     cv::Mat img = cv::imread(img_name, cv::IMREAD_UNCHANGED);
     cv::Mat depth = cv::imread(depth_name, cv::IMREAD_UNCHANGED);
     f.push_back(img);
     f.push_back(depth);
-    current_image_index_++;
     return timestamps[current_image_index_];
 }
 
 bool TUMDataset::HasNext()
 {
-    return current_image_index_ < max_image_index_;
+    return current_image_index_+1 < max_image_index_;
 }

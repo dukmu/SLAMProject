@@ -75,6 +75,7 @@ int main(int argc, char **argv)
     if (output_folder.back() != '/')
         output_folder += "/";
     fs::create_directories(output_folder);
+    fs::create_directories(output_folder + "/" + output_name);
 
     // Load categories to ignore
     vector<int> classes_to_ignore;

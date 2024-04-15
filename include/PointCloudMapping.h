@@ -53,6 +53,11 @@ namespace ORB_SLAM2 {
         {
             return self;
         }
+        bool isBusy()
+        {
+            std::unique_lock<std::mutex> lock(mMutexBusy);
+            return mIsBusy;
+        }
         void insertKeyFrame(KeyFrame* kf, const cv::Mat& color, const cv::Mat& depth); // 传入的深度图像的深度值单位已经是m
         void insertcurrentFrame(Frame &fr,const cv::Mat& color, const cv::Mat& depth); // 传入的深度图像的深度值单位已经是m
         void requestFinish();
@@ -94,6 +99,8 @@ namespace ORB_SLAM2 {
     private:
         bool mbShutdown;
         bool mbFinish;
+        bool mIsBusy;
+        std::mutex mMutexBusy;
 
         System* mpsystem;
 //        LoopClosing* mpLoopCloser;

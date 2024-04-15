@@ -161,6 +161,11 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
             {
                 continue;
             }
+
+            std::unique_lock<std::mutex> locker_busy(mMutexBusy);
+            mIsBusy = true;
+            locker_busy.unlock();
+
             static float weight = 1.0;
             int id;
             {
@@ -201,6 +206,10 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
             double T = std::chrono::duration_cast<std::chrono::duration<double>>(T2 - T1).count();
             locker.unlock();
             std::cout << "Integrate " << id << " Cost = " << T << std::endl;
+
+            locker_busy.lock();
+            mIsBusy = false;
+            locker_busy.unlock();
         }
 
         mbFinish = true;

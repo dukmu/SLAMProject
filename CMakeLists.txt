@@ -85,3 +85,5 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 add_executable(oa-slam
 Examples/oa-slam.cc Examples/dataset.cc)
 target_link_libraries(oa-slam ${PROJECT_NAME})
+
+add_subdirectory(Examples/rgbd_ros)

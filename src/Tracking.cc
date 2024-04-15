@@ -288,7 +288,7 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
     GrabObject(imRGB, detections, force_relocalize);
 
     //relocalisation mode
-    if(mCurrentFrame.mnId%5==0 && (!mCurrentFrame.mTcw.empty())){
+    if(PointCloudMapping::GetSingleton()->isBusy()==false && (!mCurrentFrame.mTcw.empty())){
         Frame F = mCurrentFrame;
         PointCloudMapping::GetSingleton()->insertcurrentFrame(F,imRGB,imD);
     }

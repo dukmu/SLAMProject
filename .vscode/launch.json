@@ -4,6 +4,41 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+{
+            "name": "rgbd_ros",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/rgbd_ros",
+            "args": [
+                "./Vocabulary/ORBvoc.txt",
+                "./Cameras/TUM2.yaml", 
+                "~/Repo/yolov5m_320.onnx",
+                "./Data/ignore_statue_parts.txt",
+                "points+objects",
+                "./output",
+                "system",
+                "yes",
+                "yes",
+                "normal"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "将反汇编风格设置为 Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
         {
             "name": "system on fr2desk",
             "type": "cppdbg",
@@ -14,7 +49,7 @@
                 "./Cameras/TUM2.yaml",
                 "../rgbd_dataset_freiburg2_desk/associate.txt",
                 "~/Repo/yolov5m_320.onnx",
-                "null",
+                "./Data/ignore_statue_parts.txt",
                 "points+objects",
                 "./output",
                 "test",
@@ -48,7 +83,7 @@
                 "./Cameras/TUM2.yaml",
                 "../rgbd_dataset_freiburg3_long_office_household/associate.txt",
                 "~/Repo/yolov5m_320.onnx",
-                "null",
+                "./Data/ignore_statue_parts.txt",
                 "points+objects",
                 "./output",
                 "test",

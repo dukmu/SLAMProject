@@ -86,7 +86,7 @@
                 "./Data/ignore_statue_parts.txt",
                 "points+objects",
                 "./output",
-                "test",
+                "test2",
                 "normal"
             ],
             "stopAtEntry": false,

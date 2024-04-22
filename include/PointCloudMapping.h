@@ -46,7 +46,7 @@ namespace ORB_SLAM2 {
 
     class PointCloudMapping {
     public:
-        PointCloudMapping(System *psystem,double resolution/*=0.01*/, std::string yaml_file);
+        PointCloudMapping(System *psystem, std::string yaml_file);
         ~PointCloudMapping();
 
         static PointCloudMapping* GetSingleton()
@@ -75,6 +75,8 @@ namespace ORB_SLAM2 {
         void generatePointCloud(const cv::Mat& imRGB, const cv::Mat& imD, const cv::Mat& pose, int nId);
         void colormeshwrite(string plyname, vector<Eigen::Vector3d>& vertices, vector<Eigen::Vector3d>& colors, vector<Eigen::Vector3i>& triangles);
         double mCx, mCy, mFx, mFy, mResolution;
+        int pc_scale;
+        std::vector<float> time_usage;
 
         pcl::visualization::PCLVisualizer::Ptr MeshViewer;
         pcl::visualization::PCLVisualizer::Ptr PCViewer;

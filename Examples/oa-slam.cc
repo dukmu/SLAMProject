@@ -141,7 +141,9 @@ int main(int argc, char **argv)
 
     // Create system
     ORB_SLAM2::System::eSensor sensor = ORB_SLAM2::System::RGBD;
-    ORB_SLAM2::System SLAM(vocabulary_file, parameters_file, sensor, true, true, false);
+    cv::FileStorage fSettings(parameters_file, cv::FileStorage::READ);
+    int visualize = fSettings["visualize"];
+    ORB_SLAM2::System SLAM(vocabulary_file, parameters_file, sensor, visualize==1, visualize==1, false);
     SLAM.SetRelocalizationMode(relocalization_mode);
 
     // Vector for tracking time statistics

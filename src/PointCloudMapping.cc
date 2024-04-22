@@ -16,11 +16,10 @@ using namespace vdbfusion;
 namespace ORB_SLAM2 {
 PointCloudMapping* PointCloudMapping::self = nullptr;
 //    class Vdb;
-    PointCloudMapping::PointCloudMapping(System *system,double resolution, std::string yaml_file):mpsystem(system)
+    PointCloudMapping::PointCloudMapping(System *system, std::string yaml_file):mpsystem(system)
     {
         self=this;
         mSystem = system;
-        mResolution = resolution;
 
         cv::FileStorage config(yaml_file, cv::FileStorage::READ);
 
@@ -28,6 +27,8 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         mCy = config["Camera.cy"];
         mFx = config["Camera.fx"];
         mFy = config["Camera.fy"];
+        mResolution = config["filter.resolution"];
+        pc_scale = config["pc_scale"];
         mbShutdown = false;
         mbFinish = true;
         cout<<"vdbfusion initialize!"<<endl;
@@ -42,20 +43,23 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         config["space_carving"] >> space_carving;
         Tsdf_Volume = make_shared<VDBVolume>(config["voxel_size"], config["sdf_trunc"],
                                                         space_carving==1);
-        voxel.setLeafSize( resolution, resolution, resolution);
         statistical_filter.setMeanK(20);
         statistical_filter.setStddevMulThresh(1.0); // The distance threshold will be equal to: mean + stddev_mult * stddev
 
         mPointCloud = std::make_shared<PointCloud>();
         vdbfuThread = std::make_shared<std::thread>(&PointCloudMapping::vdbfu, this);  // make_unique是c++14的
-        PCThread = std::make_shared<std::thread>(&PointCloudMapping::generateMeshAndPointCloud, this);
+        int visualize = config["visualize"];
+        if(visualize == 1)
+        {
+            PCThread = std::make_shared<std::thread>(&PointCloudMapping::generateMeshAndPointCloud, this);
+        }
     }
 
     PointCloudMapping::~PointCloudMapping()
     {
         mbShutdown = true;
         vdbfuThread->join();
-        PCThread->join();
+        if(PCThread) PCThread->join();
     }
 
     void PointCloudMapping::requestFinish()
@@ -143,6 +147,12 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
 
         colormeshwrite(mesh_path,vertices,colors,triangles);
         cout<<"Saving mesh to: " << mesh_path << endl;
+
+        string time_usage_path = save_path+"time_usage_"+save_name+".txt";
+        ofstream time_usage_file(time_usage_path);
+        for(auto t:time_usage){
+            time_usage_file<<t<<endl;
+        }
     }
 
     void PointCloudMapping::vdbfu() // 对重定位过程中普通帧进行重建
@@ -168,6 +178,7 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
 
             static float weight = 1.0;
             int id;
+            std::chrono::steady_clock::time_point T1 = std::chrono::steady_clock::now();
             {
                 SDFFrame frame = mSDFFrameQueue.wait_and_pop();
                 cv::Mat colorImg = frame.color;
@@ -198,7 +209,6 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
             }
             std::unique_lock<std::mutex> locker(mPointsMtx);
             cout << "points' numbers:" << mPoints.size() << endl;
-            std::chrono::steady_clock::time_point T1 = std::chrono::steady_clock::now();
             Tsdf_Volume->Integrate(mPoints, mPointcolors, origin, [](float sdf /*unused*/)
                                    { return weight; });
             Tsdf_Volume->Prune(0.5);
@@ -206,6 +216,7 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
             double T = std::chrono::duration_cast<std::chrono::duration<double>>(T2 - T1).count();
             locker.unlock();
             std::cout << "Integrate " << id << " Cost = " << T << std::endl;
+            time_usage.push_back(T);
 
             locker_busy.lock();
             mIsBusy = false;
@@ -222,10 +233,10 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         std::cout << "Converting image: " << nId << endl;
         PointCloud::Ptr current(new PointCloud);
         std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-        for(size_t v = 0; v < imRGB.rows ; v+=3){
-            for(size_t u = 0; u < imRGB.cols ; u+=3){
+        for(size_t v = 0; v < imRGB.rows ; v+=pc_scale){
+            for(size_t u = 0; u < imRGB.cols ; u+=pc_scale){
                 double d = double(imD.at<unsigned short>(v,u))/5000;
-                if(d <0.01 || d>3.5){ // 深度值为0 表示测量失败
+                if(d <0.01){ // 深度值为0 表示测量失败
                     continue;
                 }
                 PointT p;
@@ -274,7 +285,7 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         // 加入新的点云后，对整个点云进行体素滤波
         std::cout<<"size of mPointCloud is" << mPointCloud->points.size()<<std::endl;
         voxel.setInputCloud(mPointCloud);
-        voxel.setLeafSize(0.05f,0.05f,0.05f);
+        voxel.setLeafSize(mResolution, mResolution, mResolution);
         voxel.filter(*transformed);
         std::cout<<"size of transformed is" << transformed->points.size()<<std::endl;
         mPointCloud->swap(*transformed);

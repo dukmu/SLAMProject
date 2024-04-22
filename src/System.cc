@@ -110,7 +110,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR, use_objects_in_local_BA);
     mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
 
-    point_cloud_mapper_ = new PointCloudMapping(this, 0.01, strSettingsFile);
+    point_cloud_mapper_ = new PointCloudMapping(this, strSettingsFile);
 
     //Initialize the Local Mapping thread and launch
     local_object_mapper_ = nullptr;

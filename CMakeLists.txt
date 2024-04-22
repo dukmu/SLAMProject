@@ -8,10 +8,11 @@ ENDIF()
 
 MESSAGE("Build type: " ${CMAKE_BUILD_TYPE})
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -faligned-new -Wno-deprecated-declarations -O3 -march=native")
+set(CMAKE_CXX_FLAGS "-std=c++17 -faligned-new -Wno-deprecated-declarations -Og -march=native")
 
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules)
 
+set(OPENCV_DIR "/usr/local/lib/cmake/opencv4")
 find_package(OpenCV REQUIRED)
 if(NOT OpenCV_FOUND)
    message(FATAL_ERROR "OpenCV > 2.4.3 not found.")

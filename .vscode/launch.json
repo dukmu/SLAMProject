@@ -18,7 +18,6 @@
                 "./output",
                 "system",
                 "yes",
-                "yes",
                 "normal"
             ],
             "stopAtEntry": false,

@@ -49,10 +49,7 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
         mPointCloud = std::make_shared<PointCloud>();
         vdbfuThread = std::make_shared<std::thread>(&PointCloudMapping::vdbfu, this);  // make_unique是c++14的
         int visualize = config["visualize"];
-        if(visualize == 1)
-        {
-            PCThread = std::make_shared<std::thread>(&PointCloudMapping::generateMeshAndPointCloud, this);
-        }
+        PCThread = std::make_shared<std::thread>(&PointCloudMapping::generateMeshAndPointCloud, this);
     }
 
     PointCloudMapping::~PointCloudMapping()
@@ -298,10 +295,19 @@ PointCloudMapping* PointCloudMapping::self = nullptr;
     }
 
 
-    void PointCloudMapping::getGlobalCloudMap(PointCloud::Ptr &outputMap)
+    void PointCloudMapping::getGlobalCloudMap(PointCloud &outputMap)
     {
-        std::unique_lock<std::mutex> locker(mPointCloudMtx);
-        outputMap = mPointCloud;
+        mMutexMeshData.lock();
+        outputMap = mPointCloudMap;
+        mMutexMeshData.unlock();
+    }
+    void PointCloudMapping::getGlobalMeshMap(std::vector<Eigen::Vector3d> &vertices, std::vector<Eigen::Vector3d> &colors, std::vector<Eigen::Vector3i> &triangles)
+    {
+        mMutexMeshData.lock();
+        vertices = mVertices;
+        colors = mColors;
+        triangles = mTriangles;
+        mMutexMeshData.unlock();
     }
     void PointCloudMapping::colormeshwrite(string plyname, vector<Eigen::Vector3d>& vertices, vector<Eigen::Vector3d>& colors, vector<Eigen::Vector3i>& triangles){
         ofstream ply;

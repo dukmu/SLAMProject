@@ -64,7 +64,8 @@ namespace ORB_SLAM2 {
         bool isFinished();
         void saveMesh(std::string save_path, std::string save_name);
         void vdbfu();
-        void getGlobalCloudMap(PointCloud::Ptr &outputMap);
+        void getGlobalCloudMap(PointCloud &outputMap);
+        void getGlobalMeshMap(std::vector<Eigen::Vector3d> &vertices, std::vector<Eigen::Vector3d> &colors, std::vector<Eigen::Vector3i> &triangles);
         void DrawMesh();
         void DrawPointCloud(double size);
         vector<Eigen::Vector3d> mPoints;
@@ -101,7 +102,7 @@ namespace ORB_SLAM2 {
     private:
         bool mbShutdown;
         bool mbFinish;
-        bool mIsBusy;
+        bool mIsBusy = false;
         std::mutex mMutexBusy;
 
         System* mpsystem;

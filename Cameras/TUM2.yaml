@@ -33,7 +33,7 @@ sdf_trunc: 0.5
 space_carving: 1
 filter.resolution: 0.05
 pc_scale: 3
-visualize: 0
+visualize: 1
 
 #--------------------------------------------------------------------------------------------
 # ORB Parameters

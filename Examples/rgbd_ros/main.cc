@@ -10,6 +10,13 @@
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <tf/transform_listener.h>
+#include <tf/transform_broadcaster.h>
+#include <mesh_msgs/MeshGeometryStamped.h>
+#include <map_msgs/PointCloud2Update.h>
 
 #include <opencv2/core/core.hpp>
 
@@ -21,12 +28,12 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-void try_create_dir(const std::string& dir)
+void try_create_dir(const std::string &dir)
 {
-    if(!fs::exists(dir))
+    if (!fs::exists(dir))
     {
         std::cout << "Creating directory " << dir << std::endl;
-        if(!fs::create_directory(dir))
+        if (!fs::create_directory(dir))
         {
             std::cout << "Failed to create directory" << std::endl;
             return;
@@ -37,7 +44,21 @@ void try_create_dir(const std::string& dir)
 std::vector<std::string> rgb_files, depth_files;
 std::vector<double> timestamps, timestrack;
 std::vector<Eigen::Matrix4d, Eigen::aligned_allocator<Eigen::Matrix4d>> poses;
-class Callback{
+
+// ros::NodeHandle *nh;
+// ros::Publisher *pose_pub;
+// ros::Publisher *pointcloud_pub;
+// ros::Publisher *mesh_pub;
+std::shared_ptr<ros::NodeHandle> nh;
+std::shared_ptr<ros::Publisher> pose_pub;
+std::shared_ptr<ros::Publisher> pointcloud_pub;
+std::shared_ptr<ros::Publisher> mesh_pub;
+std::string map_frame, camera_frame;
+bool reloc_mode;
+std::shared_ptr<tf::TransformBroadcaster> br;
+
+class Callback
+{
 private:
     ORB_SLAM2::System *slam;
     ORB_SLAM2::ObjectDetector *detections_manager;
@@ -45,28 +66,29 @@ private:
     std::string output_path;
     std::string data_name;
     bool save_images;
+
 public:
     Callback(ORB_SLAM2::System *slam,
-                ORB_SLAM2::ObjectDetector *detections_manager,
-                ORB_SLAM2::Osmap *osmap,
-                const std::string &output_path,
-                const std::string &data_name,
-                bool save_images
-        ) : slam(slam), detections_manager(detections_manager), osmap(osmap), output_path(output_path), data_name(data_name), save_images(save_images) {}
+             ORB_SLAM2::ObjectDetector *detections_manager,
+             ORB_SLAM2::Osmap *osmap,
+             const std::string &output_path,
+             const std::string &data_name,
+             bool save_images) : slam(slam), detections_manager(detections_manager), osmap(osmap), output_path(output_path), data_name(data_name), save_images(save_images) {}
     void grab_rgbd(
         const sensor_msgs::ImageConstPtr &rgb_msg,
-        const sensor_msgs::ImageConstPtr &depth_msg
-    ){
+        const sensor_msgs::ImageConstPtr &depth_msg)
+    {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         cv_bridge::CvImageConstPtr rgb_ptr = cv_bridge::toCvShare(rgb_msg);
         cv_bridge::CvImageConstPtr depth_ptr = cv_bridge::toCvShare(depth_msg);
         cv::Mat rgb;
         cv::cvtColor(rgb_ptr->image, rgb, cv::COLOR_BGR2RGB);
 
-        if(save_images){
+        if (save_images)
+        {
             std::string path = output_path + "/" + data_name;
-            std::string rgb_file = std::to_string(rgb_ptr->header.stamp.toSec())+".png";
-            std::string depth_file = std::to_string(depth_ptr->header.stamp.toSec())+".png";
+            std::string rgb_file = std::to_string(rgb_ptr->header.stamp.toSec()) + ".png";
+            std::string depth_file = std::to_string(depth_ptr->header.stamp.toSec()) + ".png";
             rgb_files.push_back(rgb_file);
             depth_files.push_back(depth_file);
             cv::imwrite(
@@ -76,35 +98,74 @@ public:
                 path + "/depth/" + depth_file,
                 depth_ptr->image);
         }
+
+        if (reloc_mode)
+        {
+            slam->ActivateLocalizationMode();
+        }
+        else
+        {
+            slam->DeactivateLocalizationMode();
+        }
+
         std::vector<ORB_SLAM2::Detection::Ptr> detections = detections_manager->detect(rgb);
         cv::Mat pose = slam->TrackRGBD(rgb, depth_ptr->image, rgb_msg->header.stamp.toSec(), detections, false);
+        if (pose.empty())
+        {
+            std::cout << "Failed to track frame" << std::endl;
+            return;
+        }
         timestamps.push_back(rgb_msg->header.stamp.toSec());
         Eigen::Matrix4d pose_eigen = ORB_SLAM2::cvToEigenMatrix<double, double, 4, 4>(pose);
         poses.push_back(pose_eigen);
+        /*
+        know camera_link <-> map,
+        assuming know base_link <-> camera_link,
+        need to publish camera_link <-> map
+        */
+        Eigen::Matrix4d pose_inv = pose_eigen.inverse().eval();
+        geometry_msgs::PoseStamped pose_msg;
+        pose_msg.header.stamp = rgb_msg->header.stamp;
+        pose_msg.header.frame_id = camera_frame;
+        pose_msg.pose.position.x = pose_eigen(0, 3);
+        pose_msg.pose.position.y = pose_eigen(1, 3);
+        pose_msg.pose.position.z = pose_eigen(2, 3);
+        Eigen::Quaterniond q(pose_inv.block<3, 3>(0, 0));
+        pose_msg.pose.orientation.x = q.x();
+        pose_msg.pose.orientation.y = q.y();
+        pose_msg.pose.orientation.z = q.z();
+        pose_msg.pose.orientation.w = q.w();
+
+        pose_pub->publish(pose_msg);
+        tf::Transform transform_tf;
+        transform_tf.setOrigin(tf::Vector3(pose_eigen(0, 3), pose_eigen(1, 3), pose_eigen(2, 3)));
+        tf::Quaternion q_tf(q.x(), q.y(), q.z(), q.w());
+        transform_tf.setRotation(q_tf);
+        br->sendTransform(tf::StampedTransform(transform_tf, rgb_msg->header.stamp, map_frame, camera_frame));
+
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         std::cout << "Tracking " << rgb_msg->header.stamp.toSec() << " took "
                   << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms" << std::endl;
         timestrack.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
     }
 };
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     ros::init(argc, argv, "RGBD");
     ros::start();
 
-    const char *usage = \
-    "args:\n"\
-    "    1. path to vocabulary (.txt)\n"\
-    "    2. path to camera settings (.yaml)\n"\
-    "    3. detection file(.json or .onnx)\n"\
-    "    4. category to ignore file (.txt)\n"\
-    "    5. relocalization mode (string: \"points\", \"objects\" or \"points+objects\")\n"\
-    "    6. output path (string)\n"\
-    "    7. name of the saved data\n"\
-    "    8. save images (yes or no)\n"\
-    "    9. use system viewer (yes or no)\n"\
-    "    10. runtype ( normal or relocalization map file path)\n";
-    if(argc != 11)
+    const char *usage =
+        "args:\n"
+        "    1. path to vocabulary (.txt)\n"
+        "    2. path to camera settings (.yaml)\n"
+        "    3. detection file(.json or .onnx)\n"
+        "    4. category to ignore file (.txt)\n"
+        "    5. relocalization mode (string: \"points\", \"objects\" or \"points+objects\")\n"
+        "    6. output path (string)\n"
+        "    7. name of the saved data\n"
+        "    8. save images (yes or no)\n"
+        "    9. runtype ( normal or relocalization map file path)\n";
+    if (argc != 10)
     {
         std::cout << usage;
         ros::shutdown();
@@ -119,25 +180,27 @@ int main(int argc, char** argv)
     std::string output_path = argv[6];
     std::string data_name = argv[7];
     bool save_images = (std::string(argv[8]) == "yes");
-    bool use_viewer = (std::string(argv[9]) == "yes");
-    std::string runtype = argv[10];
+    std::string runtype = argv[9];
 
     try_create_dir(output_path + "/" + data_name);
-    if(save_images){
+    if (save_images)
+    {
         try_create_dir(output_path + "/" + data_name + "/rgb");
         try_create_dir(output_path + "/" + data_name + "/depth");
     }
 
     vector<int> ignore_categories;
-    if(ignore_path != "null")
+    if (ignore_path != "null")
     {
         std::ifstream ignore_file(ignore_path);
-        if(!ignore_file.is_open())
+        if (!ignore_file.is_open())
         {
             std::cout << "Failed to open ignore file" << std::endl;
-        }else{
+        }
+        else
+        {
             int i;
-            while(ignore_file >> i)
+            while (ignore_file >> i)
             {
                 ignore_categories.push_back(i);
             }
@@ -145,10 +208,12 @@ int main(int argc, char** argv)
     }
     std::shared_ptr<ORB_SLAM2::ObjectDetector> detections_manager = nullptr;
     std::string extension = get_file_extension(detection_path);
-    if(extension == "onnx")
+    if (extension == "onnx")
     {
         detections_manager = std::make_shared<ORB_SLAM2::ObjectDetector>(detection_path, ignore_categories);
-    }else{
+    }
+    else
+    {
         std::cout << "Invalid detection file: << " << detection_path << std::endl;
         return -1;
     }
@@ -166,8 +231,10 @@ int main(int argc, char** argv)
                      "It should be 'points', 'objects' or 'points+objects'.\n";
         return 1;
     }
-
-    ORB_SLAM2::System SLAM(voc_path, settings_path, ORB_SLAM2::System::RGBD, use_viewer, use_viewer);
+    int use_viewer;
+    cv::FileStorage fsSettings(settings_path, cv::FileStorage::READ);
+    use_viewer = fsSettings["visualize"];
+    ORB_SLAM2::System SLAM(voc_path, settings_path, ORB_SLAM2::System::RGBD, use_viewer == 1, use_viewer == 1);
     SLAM.SetRelocalizationMode(relocalization_mode);
 
     ORB_SLAM2::Osmap osmap(SLAM);
@@ -177,27 +244,65 @@ int main(int argc, char** argv)
         SLAM.ActivateLocalizationMode();
     }
 
-    ros::NodeHandle nh;
+    nh = std::make_shared<ros::NodeHandle>("~");
+    br = std::make_shared<tf::TransformBroadcaster>();
+    nh->param<std::string>("map_frame", map_frame, "map");
+    nh->param<std::string>("camera_frame", camera_frame, "camera_link");
+    nh->param<bool>("reloc_mode", reloc_mode, false);
+
+    pose_pub = std::make_shared<ros::Publisher>(nh->advertise<geometry_msgs::PoseStamped>("/pose", 1));
+    pointcloud_pub = std::make_shared<ros::Publisher>(nh->advertise<sensor_msgs::PointCloud2>("/pointcloud", 1));
+    // mesh_pub = std::make_shared<ros::Publisher>(nh->advertise<mesh_msgs::MeshGeometryStamped>("/mesh", 1));
+
     Callback callback(&SLAM, detections_manager.get(), &osmap, output_path, data_name, save_images);
     sleep(3);
-    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_color", 1);
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/camera/depth/image", 1);
+    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(*nh, "/camera/rgb/image_color", 1);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(*nh, "/camera/depth/image", 1);
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> MySyncPolicy;
     message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), rgb_sub, depth_sub);
     sync.registerCallback(boost::bind(&Callback::grab_rgbd, &callback, _1, _2));
 
-    while(!SLAM.ShouldQuit())
+    PointCloud pc;
+    std::vector<Eigen::Vector3d> vertices;
+    std::vector<Eigen::Vector3d> colors;
+    std::vector<Eigen::Vector3i> triangles;
+
+    while (!SLAM.ShouldQuit())
     {
+        ORB_SLAM2::PointCloudMapping::GetSingleton()->getGlobalCloudMap(pc);
+        // ORB_SLAM2::PointCloudMapping::GetSingleton()->getGlobalMeshMap(vertices, colors, triangles);
+        auto now = ros::Time::now();
+        if (pc.size() > 0)
+        {
+            sensor_msgs::PointCloud2 pc_msg;
+            pcl::PCLPointCloud2 pcl_pc;
+            pcl::toPCLPointCloud2(pc, pcl_pc);
+            pcl_conversions::fromPCL(pcl_pc, pc_msg);
+            pc_msg.header.frame_id = map_frame;
+            pc_msg.header.stamp = now;
+            pointcloud_pub->publish(pc_msg);
+        }
+        // if(vertices.size() > 0)
+        // {
+        //     mesh_msgs::MeshGeometryStamped mesh_msg;
+        //     mesh_msg.header.frame_id = map_frame;
+        //     mesh_msg.header.stamp =  now;
+        //     mesh_msg.mesh_geometry.faces = triangles;
+        //     mesh_msg.mesh_geometry.vertices = vertices;
+        //     mesh_pub->publish(mesh_msg);
+        // }
+        nh->getParam("map_frame", map_frame);
+        nh->getParam("reloc_mode", reloc_mode);
+        nh->getParam("camera_frame", camera_frame);
+
         ros::spinOnce();
     }
     SLAM.Shutdown();
 
     std::ofstream trajectory_file(
-        output_path + "/" + data_name + "/CameraTrajectory.txt", std::ios::trunc
-    );
+        output_path + "/" + data_name + "/CameraTrajectory.txt", std::ios::trunc);
     std::ofstream trajectory_json_file(
-        output_path + "/" + data_name + "/CameraTrajectory.json", std::ios::trunc
-    );
+        output_path + "/" + data_name + "/CameraTrajectory.json", std::ios::trunc);
 
     json json_data;
     for (unsigned int i = 0; i < poses.size(); ++i)
@@ -236,19 +341,19 @@ int main(int argc, char** argv)
     std::cout << "Average tracking time: " << std::accumulate(timestrack.begin(), timestrack.end(), 0.0) / timestrack.size() << "ms" << std::endl;
     std::cout << "Fastest tracking time: " << timestrack.front() << "ms" << std::endl;
     std::cout << "Slowest tracking time: " << timestrack.back() << "ms" << std::endl;
-    
 
-    if(save_images)
+    if (save_images)
     {
         std::ofstream rgb_outfile;
         rgb_outfile.open(output_path + "/" + data_name + "/rgb.txt", std::ios::trunc);
-        if(!rgb_outfile.is_open())
+        if (!rgb_outfile.is_open())
         {
             std::cout << "Failed to open rgb.txt" << std::endl;
             return -1;
         }
-        rgb_outfile << "# color images\n" << "# timestamp filename\n";
-        for(std::string line : rgb_files)
+        rgb_outfile << "# color images\n"
+                    << "# timestamp filename\n";
+        for (std::string line : rgb_files)
         {
             rgb_outfile << line << "\n";
         }
@@ -256,13 +361,14 @@ int main(int argc, char** argv)
 
         std::ofstream depth_outfile;
         depth_outfile.open(output_path + "/" + data_name + "/depth.txt", std::ios::trunc);
-        if(!depth_outfile.is_open())
+        if (!depth_outfile.is_open())
         {
             std::cout << "Failed to open depth.txt" << std::endl;
             return -1;
         }
-        depth_outfile << "# depth images\n" << "# timestamp filename\n";
-        for(std::string line : depth_files)
+        depth_outfile << "# depth images\n"
+                      << "# timestamp filename\n";
+        for (std::string line : depth_files)
         {
             depth_outfile << line << "\n";
         }

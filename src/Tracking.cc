@@ -561,8 +561,7 @@ void Tracking::GrabObject(const cv::Mat &im,
                     for (auto& tr : objectTracks_) { //DUMU ?why only initialized tracks? why do it twice?
                         if (tr->GetLastObsFrameId() == current_frame_idx_) {
                             // Try reconstruct from points
-                            if ((tr->GetNbObservations() > 10 && tr->GetStatus() == ObjectTrackStatus::ONLY_2D) ||
-                                (tr->GetNbObservations() % 2 == 0 && tr->GetStatus() == ObjectTrackStatus::INITIALIZED)) {
+                            if ((tr->GetNbObservations() > 10 && tr->GetStatus() == ObjectTrackStatus::ONLY_2D) ) {
                                 // tr->ReconstructFromSamplesEllipsoid();
                                 // tr->ReconstructFromSamplesCenter();
 

@@ -19,6 +19,8 @@
 #include <map_msgs/PointCloud2Update.h>
 
 #include <opencv2/core/core.hpp>
+//cv2eigen
+#include <opencv2/core/eigen.hpp>
 
 #include "Osmap.h"
 #include "System.h"
@@ -54,7 +56,7 @@ std::shared_ptr<ros::Publisher> pose_pub;
 std::shared_ptr<ros::Publisher> pointcloud_pub;
 std::shared_ptr<ros::Publisher> mesh_pub;
 std::string map_frame, camera_frame;
-bool reloc_mode;
+bool reloc_mode = false, stop = false, pauseslam = false;
 std::shared_ptr<tf::TransformBroadcaster> br;
 
 class Callback
@@ -78,11 +80,18 @@ public:
         const sensor_msgs::ImageConstPtr &rgb_msg,
         const sensor_msgs::ImageConstPtr &depth_msg)
     {
+        if (pauseslam)
+        {
+            return;
+        }
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         cv_bridge::CvImageConstPtr rgb_ptr = cv_bridge::toCvShare(rgb_msg);
         cv_bridge::CvImageConstPtr depth_ptr = cv_bridge::toCvShare(depth_msg);
-        cv::Mat rgb;
+        cv::Mat rgb, depth;
         cv::cvtColor(rgb_ptr->image, rgb, cv::COLOR_BGR2RGB);
+        cv::Mat depth32f = depth_ptr->image;
+        cv::patchNaNs(depth32f, 0);
+        depth32f.convertTo(depth, CV_16UC1, 5000.0);
 
         if (save_images)
         {
@@ -96,27 +105,24 @@ public:
                 rgb);
             cv::imwrite(
                 path + "/depth/" + depth_file,
-                depth_ptr->image);
+                depth);
         }
 
         if (reloc_mode)
         {
             slam->ActivateLocalizationMode();
         }
-        else
-        {
-            slam->DeactivateLocalizationMode();
-        }
 
         std::vector<ORB_SLAM2::Detection::Ptr> detections = detections_manager->detect(rgb);
-        cv::Mat pose = slam->TrackRGBD(rgb, depth_ptr->image, rgb_msg->header.stamp.toSec(), detections, false);
+        cv::Mat pose = slam->TrackRGBD(rgb, depth, rgb_msg->header.stamp.toSec(), detections, false);
         if (pose.empty())
         {
             std::cout << "Failed to track frame" << std::endl;
             return;
         }
         timestamps.push_back(rgb_msg->header.stamp.toSec());
-        Eigen::Matrix4d pose_eigen = ORB_SLAM2::cvToEigenMatrix<double, double, 4, 4>(pose);
+        Eigen::Matrix4d pose_eigen;
+        cv::cv2eigen(pose, pose_eigen);
         poses.push_back(pose_eigen);
         /*
         know camera_link <-> map,
@@ -126,10 +132,10 @@ public:
         Eigen::Matrix4d pose_inv = pose_eigen.inverse().eval();
         geometry_msgs::PoseStamped pose_msg;
         pose_msg.header.stamp = rgb_msg->header.stamp;
-        pose_msg.header.frame_id = camera_frame;
-        pose_msg.pose.position.x = pose_eigen(0, 3);
-        pose_msg.pose.position.y = pose_eigen(1, 3);
-        pose_msg.pose.position.z = pose_eigen(2, 3);
+        pose_msg.header.frame_id = map_frame;
+        pose_msg.pose.position.x = pose_inv(0, 3);
+        pose_msg.pose.position.y = pose_inv(1, 3);
+        pose_msg.pose.position.z = pose_inv(2, 3);
         Eigen::Quaterniond q(pose_inv.block<3, 3>(0, 0));
         pose_msg.pose.orientation.x = q.x();
         pose_msg.pose.orientation.y = q.y();
@@ -138,13 +144,15 @@ public:
 
         pose_pub->publish(pose_msg);
         tf::Transform transform_tf;
-        transform_tf.setOrigin(tf::Vector3(pose_eigen(0, 3), pose_eigen(1, 3), pose_eigen(2, 3)));
+        transform_tf.setOrigin(tf::Vector3(pose_inv(0, 3), pose_inv(1, 3), pose_inv(2, 3)));
         tf::Quaternion q_tf(q.x(), q.y(), q.z(), q.w());
         transform_tf.setRotation(q_tf);
-        br->sendTransform(tf::StampedTransform(transform_tf, rgb_msg->header.stamp, map_frame, camera_frame));
+        br->sendTransform(tf::StampedTransform(transform_tf, rgb_msg->header.stamp, camera_frame, map_frame));
 
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        std::cout << "Tracking " << rgb_msg->header.stamp.toSec() << " took "
+        stringstream ss;
+        ss << rgb_msg->header.stamp.toSec();
+        std::cout << "Tracking " << ss.str() << " took "
                   << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms" << std::endl;
         timestrack.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count());
     }
@@ -249,15 +257,17 @@ int main(int argc, char **argv)
     nh->param<std::string>("map_frame", map_frame, "map");
     nh->param<std::string>("camera_frame", camera_frame, "camera_link");
     nh->param<bool>("reloc_mode", reloc_mode, false);
+    nh->param<bool>("stop", stop, false);
+    nh->param<bool>("pauseslam", pauseslam, false);
 
-    pose_pub = std::make_shared<ros::Publisher>(nh->advertise<geometry_msgs::PoseStamped>("/pose", 1));
-    pointcloud_pub = std::make_shared<ros::Publisher>(nh->advertise<sensor_msgs::PointCloud2>("/pointcloud", 1));
+    pose_pub = std::make_shared<ros::Publisher>(nh->advertise<geometry_msgs::PoseStamped>("pose", 1));
+    pointcloud_pub = std::make_shared<ros::Publisher>(nh->advertise<sensor_msgs::PointCloud2>("pointcloud", 1));
     // mesh_pub = std::make_shared<ros::Publisher>(nh->advertise<mesh_msgs::MeshGeometryStamped>("/mesh", 1));
 
     Callback callback(&SLAM, detections_manager.get(), &osmap, output_path, data_name, save_images);
     sleep(3);
-    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(*nh, "/camera/rgb/image_color", 1);
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub(*nh, "/camera/depth/image", 1);
+    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(*nh, "/camera/rgb/image_color", 100);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(*nh, "/camera/depth/image", 100);
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> MySyncPolicy;
     message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), rgb_sub, depth_sub);
     sync.registerCallback(boost::bind(&Callback::grab_rgbd, &callback, _1, _2));
@@ -267,7 +277,7 @@ int main(int argc, char **argv)
     std::vector<Eigen::Vector3d> colors;
     std::vector<Eigen::Vector3i> triangles;
 
-    while (!SLAM.ShouldQuit())
+    while (!stop)
     {
         ORB_SLAM2::PointCloudMapping::GetSingleton()->getGlobalCloudMap(pc);
         // ORB_SLAM2::PointCloudMapping::GetSingleton()->getGlobalMeshMap(vertices, colors, triangles);
@@ -294,6 +304,8 @@ int main(int argc, char **argv)
         nh->getParam("map_frame", map_frame);
         nh->getParam("reloc_mode", reloc_mode);
         nh->getParam("camera_frame", camera_frame);
+        nh->getParam("stop", stop);
+        nh->getParam("pauseslam", pauseslam);
 
         ros::spinOnce();
     }

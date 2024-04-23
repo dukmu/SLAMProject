@@ -181,7 +181,7 @@ void ARViewer::Run()
     RenderMode current_mode = RenderMode::color;
     pangolin::AxisDirection spin_direction = pangolin::AxisNone;
     std::vector<std::future<pangolin::Geometry>> geom_to_load;
-    std::vector<std::string>  fn = {"./Data/ball.ply"};
+    std::vector<std::string>  fn; // DUMU:del ball = {"./Data/ball.ply"};
      for(const auto& filename : fn)
     {
         geom_to_load.emplace_back(std::async(std::launch::async,[filename](){
@@ -273,6 +273,9 @@ void ARViewer::Run()
                 T(2, 2) = max_size;
                 T.block<3, 1>(0, 3) = c.cast<float>();
                 auto transform = std::make_shared<FixedTransform>(T);
+                if (renderables.empty()) {
+                    continue;
+                }
                 RenderNode::Edge edge = { transform, { renderables[0] , {} } };
                 root.edges.emplace_back(std::move(edge));
             }

@@ -52,7 +52,7 @@
                 "points+objects",
                 "./output",
                 "test",
-                "normal"
+                "./output/test/Map.osmap.yaml"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/",

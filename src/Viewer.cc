@@ -108,7 +108,7 @@ void Viewer::Run()
     pangolin::Var<bool> menuCatCol("menu.Color by Cat", false, true);
     pangolin::Var<bool> menu3DBbox("menu.Disp 3D Bboxes", false, true);
     pangolin::Var<bool> menuDistEstim("menu.Disp Distance Est.", false, true);
-    pangolin::Var<bool> menuDispARModels("menu.Disp AR Models", true, true);
+    pangolin::Var<bool> menuDispARModels("menu.Disp AR Models", false, true);
     pangolin::Var<bool> menuARFixSize("menu.Fixed AR size", true, true);
     pangolin::Var<bool> menuQuit("menu.Quit",false,false);
 

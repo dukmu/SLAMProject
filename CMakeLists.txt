@@ -88,3 +88,7 @@ Examples/oa-slam.cc Examples/dataset.cc)
 target_link_libraries(oa-slam ${PROJECT_NAME})
 
 add_subdirectory(Examples/rgbd_ros)
+
+add_executable(eval_ellipsoid
+Examples/eval_ellipsoid.cc)
+target_link_libraries(eval_ellipsoid ${PROJECT_NAME})

@@ -29,8 +29,8 @@ Camera.bf: 40.0
 DepthMapFactor: 5208.0
 
 voxel_size: 0.02
-sdf_trunc: 0.2
-space_carving: 1
+sdf_trunc: 0.3
+space_carving: 0
 filter.resolution: 0.05
 pc_scale: 3
 visualize: 1

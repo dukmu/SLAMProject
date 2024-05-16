@@ -4,6 +4,7 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        {"name":"Python 调试程序: 包含参数的当前文件","type":"debugpy","request":"launch","program":"${file}","console":"integratedTerminal","args":"${command:pickArgs}"},
 {
             "name": "rgbd_ros",
             "type": "cppdbg",
@@ -52,7 +53,8 @@
                 "points+objects",
                 "./output",
                 "test",
-                "./output/test/Map.osmap.yaml"
+                "normal"
+                // "./output/椭球的不同初始化方法对椭球精度的影响/test-内切-fr2desk/Map.osmap.yaml"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/",
@@ -87,6 +89,107 @@
                 "./output",
                 "test2",
                 "normal"
+                // "./output/椭球的不同初始化方法对椭球精度的影响/test-内切-fr3office/Map.osmap.yaml"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "将反汇编风格设置为 Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "eval",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/eval_ellipsoid",
+            "args": [
+                "./Cameras/TUM2.yaml",
+                "./output",
+                "eval",
+                "./output/test/Map.osmap.yaml",
+                "./Vocabulary/ORBvoc.txt"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "将反汇编风格设置为 Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "system on real 1",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/oa-slam",
+            "args": [
+                "./Vocabulary/ORBvoc.txt",
+                "./Cameras/TUM2.yaml",
+                "~/Repo/data_obj/new_office_1/associate.txt",
+                "~/Repo/yolov5m_320.onnx",
+                "./Data/ignore_statue_parts.txt",
+                "points+objects",
+                "./output",
+                "test1",
+                "normal"
+                // "./output/椭球的不同初始化方法对椭球精度的影响/test-内切-fr3office/Map.osmap.yaml"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "为 gdb 启用整齐打印",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "将反汇编风格设置为 Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "system on real 2",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/oa-slam",
+            "args": [
+                "./Vocabulary/ORBvoc.txt",
+                "./Cameras/TUM2.yaml",
+                "~/Repo/data_obj/new_office_2/associate.txt",
+                "~/Repo/yolov5m_320.onnx",
+                "./Data/ignore_statue_parts.txt",
+                "points+objects",
+                "./output",
+                "test2",
+                "normal"
+                // "./output/椭球的不同初始化方法对椭球精度的影响/test-内切-fr3office/Map.osmap.yaml"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/",

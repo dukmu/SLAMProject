@@ -34,6 +34,11 @@ ReconstructEllipsoidFromCenters(const std::vector<BBox2, Eigen::aligned_allocato
                                 const std::vector<Matrix34d, Eigen::aligned_allocator<Matrix34d>>& Rts, 
                                 const Eigen::Matrix3d& K);
 
+std::pair<bool, Ellipsoid>
+ReconstructEllipsoidFromBox(const std::vector<BBox2, Eigen::aligned_allocator<BBox2>>& bboxes,
+                                const std::vector<Matrix34d, Eigen::aligned_allocator<Matrix34d>>& Rts, 
+                                const Eigen::Matrix3d& K);
+
 Eigen::Vector3d TriangulatePoints2(const Eigen::Vector2d& uv1, const Eigen::Vector2d& uv2,
                                   const Matrix34d& P1, const Matrix34d& P2);
 

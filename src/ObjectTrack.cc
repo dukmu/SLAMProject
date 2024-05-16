@@ -183,6 +183,7 @@ bool ObjectTrack::ReconstructFromCenter(bool use_keyframes) // for init
 
 
     auto [status, ellipsoid] = ReconstructEllipsoidFromCenters(bboxes, Rts, tracker_->GetK());
+    // auto [status, ellipsoid] = ReconstructEllipsoidCrocco(bboxes, Rts, tracker_->GetK(), false);
 
     if (!status)
         return false;
@@ -312,10 +313,12 @@ void ObjectTrack::OptimizeReconstruction(Map *map)
         Eigen::Matrix<double, 1, 1> information_matrix = Eigen::Matrix<double, 1, 1>::Identity();
         information_matrix *= *it_s;
         edge->setInformation(information_matrix);
+        g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
+        edge->setRobustKernel(rk);
         optimizer.addEdge(edge);
     }
     optimizer.initializeOptimization();
-    optimizer.optimize(8);
+    optimizer.optimize(12);
     Eigen::Matrix<double, 6, 1> ellipsoid_est = vertex->estimate();
     // EllipsoidQuat ellipsoid_quat_est = vertex->estimate();
 

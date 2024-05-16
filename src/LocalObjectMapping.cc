@@ -195,7 +195,7 @@ void LocalObjectMapping::OptimizeReconstruction(MapObject *obj)
         // edge->setInformation(W);
         // edge->setInformation(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>::Identity(24, 24));
         g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-        // edge->setRobustKernel(rk);
+        edge->setRobustKernel(rk);
         // rk->setDelta(0.1);
         optimizer.addEdge(edge);
     }

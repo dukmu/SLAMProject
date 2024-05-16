@@ -166,7 +166,55 @@ ReconstructEllipsoidFromCenters(const std::vector<BBox2, Eigen::aligned_allocato
     return {true, Ellipsoid(Eigen::Vector3d::Ones() * mean_3D_size * 0.5, Eigen::Matrix3d::Identity(), center)};
 }
 
+std::pair<bool, Ellipsoid>
+ReconstructEllipsoidFromBox(const std::vector<BBox2, Eigen::aligned_allocator<BBox2>>& bboxes,
+                                const std::vector<Matrix34d, Eigen::aligned_allocator<Matrix34d>>& Rts, 
+                                const Eigen::Matrix3d& K)
+{
+    size_t n = bboxes.size();
 
+    std::vector<Eigen::Vector3d> box(n*4);
+    std::vector<Matrix34d, Eigen::aligned_allocator<Matrix34d>> projections(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        const auto& bb = bboxes[i];
+        projections[i] = K * Rts[i];
+        Eigen::Vector3d p0 = Rts[i] * Eigen::Vector4d(bb[0], bb[1], 1.0, 1.0);
+        Eigen::Vector3d p1 = Rts[i] * Eigen::Vector4d(bb[2], bb[1], 1.0, 1.0);
+        Eigen::Vector3d p2 = Rts[i] * Eigen::Vector4d(bb[2], bb[3], 1.0, 1.0);
+        Eigen::Vector3d p3 = Rts[i] * Eigen::Vector4d(bb[0], bb[3], 1.0, 1.0);
+        box[i*4] = (p0 + p1) / 2;
+        box[i*4+1] = (p1 + p2) / 2;
+        box[i*4+2] = (p2 + p3) / 2;
+        box[i*4+3] = (p3 + p0) / 2;
+    }
+    Eigen::Matrix<double, 3, Eigen::Dynamic> M;
+    Eigen::Vector3d center(0.0, 0.0, 0.0);
+    int a = 0;
+    for (size_t i = 0; i < box.size(); ++i) {
+        int a = M.cols();
+        M.conservativeResize(Eigen::NoChange, a+1);
+        M.col(a) = box[i];
+        center += M.col(a);
+    }
+
+    if (M.cols() < 5) {
+        std::cerr << "PCA failed: need at least 5 points.\n";
+        return {false, Ellipsoid()};
+    }
+
+    // Reconstruct
+    center /= M.cols();
+    Eigen::Matrix<double, 3, Eigen::Dynamic> M_centered = M.colwise() - center;
+    Eigen::Matrix3d A = (1.0 / M.cols()) * (M_centered * M_centered.transpose());
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(A);
+    Eigen::Matrix3d R = solver.eigenvectors();
+    Eigen::Vector3d s = 2 * solver.eigenvalues().cwiseAbs().cwiseSqrt();
+    if (R.determinant() < 0) {
+        R.col(2) *= -1;
+    }
+    return {true, Ellipsoid(s, R, center)};
+}
 
 std::pair<bool, Ellipsoid>
 ReconstructEllipsoidFromLandmarks(const std::vector<BBox2, Eigen::aligned_allocator<BBox2>>& bboxes,
@@ -236,7 +284,8 @@ Eigen::MatrixXd compute_B_perspective(const Eigen::Matrix<double, 3, 4>& P)
          p31_2, 2*p32*p31, 2*p33*p31, 2*p34*p31, p32_2, 2*p33*p32, 2*p34*p32, p33_2, 2*p33*p34, p34_2;
     return B;
 }
-
+// PQ*P^T = C*, from C* find Q*, and we know P, so we can do it by:
+// flatten to Ax = 0, and concatenate all the equations, the solve by svd
 Ellipsoid reconstruct_ellipsoid_lstsq(const std::vector<Ellipse, Eigen::aligned_allocator<Ellipse>>& ellipses,
                                       const std::vector<Matrix34d, Eigen::aligned_allocator<Matrix34d>>& projections)
 {

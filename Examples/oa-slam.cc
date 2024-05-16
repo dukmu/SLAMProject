@@ -157,11 +157,12 @@ int main(int argc, char **argv)
          << endl;
 
     ORB_SLAM2::Osmap osmap = ORB_SLAM2::Osmap(SLAM);
-    
+    bool isloc=false;
     if (runtype != "normal")
     {
         osmap.mapLoad(runtype);
         SLAM.ActivateLocalizationMode();
+        isloc=true;
     }
     // Main loop
     cv::Mat im;
@@ -205,7 +206,7 @@ int main(int argc, char **argv)
         }
 
         // Pass the image and detections to the SLAM system
-        cv::Mat m = SLAM.TrackRGBD(im, imDepth, timestamp, detections, false);
+        cv::Mat m = SLAM.TrackRGBD(im, imDepth, timestamp, detections, isloc);
 
         if (m.rows && m.cols)
             poses.push_back(ORB_SLAM2::cvToEigenMatrix<double, float, 4, 4>(m));
